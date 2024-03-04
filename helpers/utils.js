@@ -1,4 +1,5 @@
-const { ethers } = require("hardhat");
+import { ethers } from "hardhat";
+}
 
 /**
  * Signs the provided message with the provided wallet
@@ -41,9 +42,8 @@ const getEthBalances = (accounts) =>
 const randomHex = (length) =>
   ethers.hexlify(ethers.randomBytes(Math.min((length - 2) / 2)));
 
-module.exports = {
-  signMessage,
+export {
   getBalances,
   getEthBalances,
-  randomHex,
+  randomHex, signMessage
 };

@@ -142,14 +142,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert CurrencyNotAccepted();
         }
         IERC20 token = IERC20(_tokenAddress);
-        uint256 allowance = token.allowance(msg.sender, address(this));
-        if (allowance < _amount) {
-            revert InsufficientAllowance();
-        }
-        uint256 senderBalance = token.balanceOf(msg.sender);
-        if (senderBalance < _amount) {
-            revert InsufficientBalance();
-        }
+
         bool sent = token.transferFrom(msg.sender, address(this), _amount);
         if (!sent) {
             revert TransferFailed();

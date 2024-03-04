@@ -1,6 +1,6 @@
-const hre = require("hardhat");
-const signale = require("signale-logger");
-const isEmpty = require("lodash/isEmpty");
+import hre from "hardhat";
+import { isEmpty, uniqueId } from "lodash-es";
+import signale from "signale-logger";
 
 const deploymentLogger = signale.scope("Deployment");
 
@@ -18,6 +18,7 @@ const deployContract = async (contractName, args) => {
   );
   try {
     contractDeploymentLogger.await();
+
     const contract = await hre.ethers.deployContract(
       contractName,
       ...(isEmpty(args) ? [] : [args])
@@ -27,7 +28,14 @@ const deployContract = async (contractName, args) => {
     await contract.waitForDeployment();
     const contractAddress = await contract.getAddress();
     contractDeploymentLogger.complete(`Deployed to ${contractAddress}`);
-    deployedContracts[contractName] = { contractAddress, transactionHash };
+    if (!isEmpty(deployedContracts[contractName])) {
+      deployedContracts[contractName + " " + uniqueId()] = {
+        contractAddress,
+        transactionHash,
+      };
+    } else {
+      deployedContracts[contractName] = { contractAddress, transactionHash };
+    }
     return { contract, address: contractAddress };
   } catch (e) {
     contractDeploymentLogger.error(`Failed to deploy ${contractName}\n`, e);
@@ -38,5 +46,4 @@ const deployContract = async (contractName, args) => {
 const logDeployedContracts = () => {
   console.table(deployedContracts);
 };
-
-module.exports = { deployContract, logDeployedContracts, deploymentLogger };
+export { deployContract, deploymentLogger, logDeployedContracts };

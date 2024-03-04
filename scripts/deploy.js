@@ -1,9 +1,9 @@
-const hre = require("hardhat");
-const {
+import hre from "hardhat";
+import {
   deployContract,
-  logDeployedContracts,
   deploymentLogger,
-} = require("../helpers/deployment");
+  logDeployedContracts,
+} from "../helpers/deployment.js";
 
 const tokens = {
   mainnet: {
@@ -21,10 +21,16 @@ async function main() {
   deploymentLogger.start("Deploying contracts...");
   const wallets = await hre.ethers.getSigners(10);
   // Deploy contracts here using deployContract
-  await deployContract("OmronDeposit", [
-    wallets[0].address,
-    Object.values(tokens[hre.network.name]),
-  ]);
+  let tokenAddresses = tokens[hre.network.name];
+  if (hre.network.name === "localhost") {
+    const erc20Deployments = [];
+    for (let i = 0; i < 5; i++) {
+      erc20Deployments[i] = await deployContract("tstETH", [10000]);
+    }
+    tokenAddresses = erc20Deployments.map((d) => d.address);
+  }
+
+  await deployContract("OmronDeposit", [wallets[0].address, tokenAddresses]);
 }
 let wasError = false;
 main()

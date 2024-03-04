@@ -14,19 +14,19 @@ This project consists of one contract, listed below.
 
 ### Install
 
-```bash
+```console
 pnpm install
 ```
 
 ### Deploy to Localhost
 
-```bash
+```console
 pnpm dev
 ```
 
 ### Run Unit Tests
 
-```bash
+```console
 pnpm test
 ```
 
@@ -34,12 +34,14 @@ pnpm test
 
 This is for advanced SC debugging. It will get very loud very quick, be prepared for an onslaught of logs. This uses [`hardhat-tracer`] to fully trace SC calls.
 
-```bash
+```console
 pnpm test:debug
 ```
 
 ### Deploy
 
-```bash
+```console
 pnpm deploy
 ```
+
+[`hardhat-tracer`]: https://github.com/zemse/hardhat-tracer "Hardhat Tracer GitHub Repo"
