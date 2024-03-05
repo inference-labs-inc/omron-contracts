@@ -18,14 +18,19 @@ const tokens = {
 
 async function main() {
   deploymentLogger.time("Deployment Time");
-  deploymentLogger.start("Deploying contracts...");
+
+  deploymentLogger[process.env.DRY_RUN ? "dry_run" : "start"](
+    "Deploying contracts..."
+  );
   const wallets = await hre.ethers.getSigners(10);
   // Deploy contracts here using deployContract
   let tokenAddresses = tokens[hre.network.name];
   if (hre.network.name === "localhost") {
     const erc20Deployments = [];
     for (let i = 0; i < 5; i++) {
-      erc20Deployments[i] = await deployContract("tstETH", [10000]);
+      erc20Deployments[i] = await deployContract("tstETH", [
+        ethers.parseEther("1000000"),
+      ]);
     }
     tokenAddresses = erc20Deployments.map((d) => d.address);
   }
@@ -36,7 +41,9 @@ let wasError = false;
 main()
   .then(() => {
     deploymentLogger.timeEnd("Deployment Time");
-    deploymentLogger.scope("Deployment").complete(`All contracts deployed.`);
+    deploymentLogger
+      .scope("Deployment")
+      [process.env.DRY_RUN ? "dry_run" : "start"](`All contracts deployed.`);
   })
   .catch((error) => {
     deploymentLogger.fatal("Deployments Failed\n", error);

@@ -2,6 +2,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { deployDepositContractFixture } from "./helpers/fixtures.js";
 import { addAllowance } from "./helpers/utils.js";
+
 describe("OmronDeposit", () => {
   let owner, user1, user2;
   before(async () => {
@@ -82,14 +83,22 @@ describe("OmronDeposit", () => {
         .withArgs(owner.address);
 
       await expect(
-        user1.sendTransaction({ to: deposit.address, value: 1000 })
+        user1.sendTransaction({
+          to: deposit.address,
+          value: ethers.parseEther("1"),
+        })
       ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
     it("Should accept valid deposit", async () => {
       const { deposit } = await loadFixture(deployDepositContractFixture);
-      await expect(user1.sendTransaction({ to: deposit.address, value: 1000 }))
+      await expect(
+        user1.sendTransaction({
+          to: deposit.address,
+          value: ethers.parseEther("1"),
+        })
+      )
         .to.emit(deposit.contract, "EtherDeposit")
-        .withArgs(user1.address, 1000);
+        .withArgs(user1.address, ethers.parseEther("1"));
     });
   });
   describe("withdrawEther", () => {
@@ -100,21 +109,21 @@ describe("OmronDeposit", () => {
         .withArgs(owner.address);
 
       await expect(
-        deposit.contract.connect(user1).withdrawEther(1000)
+        deposit.contract.connect(user1).withdrawEther(ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
     it("Should reject withdraw with no balance", async () => {
       const { deposit } = await loadFixture(deployDepositContractFixture);
       await deposit.contract.setWithdrawalsEnabled(true);
       await expect(
-        deposit.contract.connect(user1).withdrawEther(1000)
+        deposit.contract.connect(user1).withdrawEther(ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "InsufficientBalance");
     });
     it("Should reject withdraw when withdrawals disabled", async () => {
       const { deposit } = await loadFixture(deployDepositContractFixture);
 
       await expect(
-        deposit.contract.connect(owner).withdrawEther(1000)
+        deposit.contract.connect(owner).withdrawEther(ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "WithdrawalsDisabled");
     });
   });
@@ -129,7 +138,9 @@ describe("OmronDeposit", () => {
         .withArgs(owner.address);
 
       await expect(
-        deposit.contract.connect(user1).withdraw(token1.address, 1000)
+        deposit.contract
+          .connect(user1)
+          .withdraw(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
     it("Should reject withdraw with no balance", async () => {
@@ -139,7 +150,9 @@ describe("OmronDeposit", () => {
       const [token1] = erc20Deployments;
       await deposit.contract.setWithdrawalsEnabled(true);
       await expect(
-        deposit.contract.connect(user1).withdraw(token1.address, 1000)
+        deposit.contract
+          .connect(user1)
+          .withdraw(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "InsufficientBalance");
     });
     it("Should reject withdraw when withdrawals disabled", async () => {
@@ -147,9 +160,11 @@ describe("OmronDeposit", () => {
         deployDepositContractFixture
       );
       const [token1] = erc20Deployments;
-      await addAllowance(token1, owner, deposit, 1000);
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
       await expect(
-        deposit.contract.connect(owner).withdraw(token1.address, 1000)
+        deposit.contract
+          .connect(owner)
+          .withdraw(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "WithdrawalsDisabled");
     });
   });
@@ -164,7 +179,9 @@ describe("OmronDeposit", () => {
         .withArgs(owner.address);
 
       await expect(
-        deposit.contract.connect(user1).deposit(token1.address, 1000)
+        deposit.contract
+          .connect(user1)
+          .deposit(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
     it("Should reject deposit with no allowance", async () => {
@@ -174,7 +191,7 @@ describe("OmronDeposit", () => {
       const [token1] = erc20Deployments;
 
       expect(
-        deposit.contract.deposit(token1.address, 1000)
+        deposit.contract.deposit(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "TransferFailed");
     });
     it("Should reject deposit with empty balance", async () => {
@@ -182,10 +199,12 @@ describe("OmronDeposit", () => {
         deployDepositContractFixture
       );
       const [token1] = erc20Deployments;
-      await addAllowance(token1, user2, deposit, 1000);
+      await addAllowance(token1, user2, deposit, ethers.parseEther("1"));
 
       await expect(
-        deposit.contract.connect(user2).deposit(token1.address, 1000)
+        deposit.contract
+          .connect(user2)
+          .deposit(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(
         token1.contract,
         "ERC20InsufficientBalance"
@@ -197,22 +216,29 @@ describe("OmronDeposit", () => {
       );
 
       const [token1] = erc20Deployments;
-      await addAllowance(token1, owner, deposit, 1000);
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
 
-      await expect(deposit.contract.deposit(token1.address, 1000))
+      await expect(
+        deposit.contract.deposit(token1.address, ethers.parseEther("1"))
+      )
         .to.emit(deposit.contract, "Deposit")
-        .withArgs(owner.address, token1.address, 1000);
+        .withArgs(owner.address, token1.address, ethers.parseEther("1"));
     });
     it("Should reject deposit of non-whitelisted token", async () => {
       const { deposit, nonWhitelistedToken } = await loadFixture(
         deployDepositContractFixture
       );
 
-      await addAllowance(nonWhitelistedToken, owner, deposit, 1000);
+      await addAllowance(
+        nonWhitelistedToken,
+        owner,
+        deposit,
+        ethers.parseEther("1")
+      );
       await expect(
         deposit.contract
           .connect(owner)
-          .deposit(nonWhitelistedToken.address, 1000)
+          .deposit(nonWhitelistedToken.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "TokenNotWhitelisted");
     });
   });
@@ -226,7 +252,9 @@ describe("OmronDeposit", () => {
         .to.emit(deposit.contract, "Paused")
         .withArgs(owner.address);
       await expect(
-        deposit.contract.connect(user1).withdraw(token1.address, 1000)
+        deposit.contract
+          .connect(user1)
+          .withdraw(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
     it("Should reject withdraw with no balance", async () => {
@@ -236,7 +264,9 @@ describe("OmronDeposit", () => {
       const [token1] = erc20Deployments;
       await deposit.contract.setWithdrawalsEnabled(true);
       await expect(
-        deposit.contract.connect(user1).withdraw(token1.address, 1000)
+        deposit.contract
+          .connect(user1)
+          .withdraw(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "InsufficientBalance");
     });
     it("Should reject withdraw when withdrawals disabled", async () => {
@@ -244,9 +274,11 @@ describe("OmronDeposit", () => {
         deployDepositContractFixture
       );
       const [token1] = erc20Deployments;
-      await addAllowance(token1, owner, deposit, 1000);
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
       await expect(
-        deposit.contract.connect(owner).withdraw(token1.address, 1000)
+        deposit.contract
+          .connect(owner)
+          .withdraw(token1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "WithdrawalsDisabled");
     });
     it("Should accept valid withdraw", async () => {
@@ -255,11 +287,13 @@ describe("OmronDeposit", () => {
       );
       await deposit.contract.setWithdrawalsEnabled(true);
       const [token1] = erc20Deployments;
-      await addAllowance(token1, owner, deposit, 1000);
-      await deposit.contract.deposit(token1.address, 1000);
-      await expect(deposit.contract.withdraw(token1.address, 1000))
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
+      await deposit.contract.deposit(token1.address, ethers.parseEther("1"));
+      await expect(
+        deposit.contract.withdraw(token1.address, ethers.parseEther("1"))
+      )
         .to.emit(deposit.contract, "Withdrawal")
-        .withArgs(owner.address, token1.address, 1000);
+        .withArgs(owner.address, token1.address, ethers.parseEther("1"));
     });
   });
   describe("addWhitelistedToken", () => {
@@ -296,26 +330,32 @@ describe("OmronDeposit", () => {
       );
       const [token1, token2] = erc20Deployments;
       let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(0);
-      await addAllowance(token1, owner, deposit, 1000);
-      await deposit.contract.deposit(token1.address, 1000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
+      await deposit.contract.deposit(token1.address, ethers.parseEther("1"));
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(1000);
-      await addAllowance(token2, owner, deposit, 1000);
-      await deposit.contract.deposit(token2.address, 1000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("1"));
+      await addAllowance(token2, owner, deposit, ethers.parseEther("1"));
+      await deposit.contract.deposit(token2.address, ethers.parseEther("1"));
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(2000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("2"));
     });
     it("Should handle simple points per second increase with ETH Deposits", async () => {
       const { deposit } = await loadFixture(deployDepositContractFixture);
       let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(0);
-      await owner.sendTransaction({ to: deposit.address, value: 1000 });
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: ethers.parseEther("1"),
+      });
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(1000);
-      await owner.sendTransaction({ to: deposit.address, value: 1000 });
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("1"));
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: ethers.parseEther("1"),
+      });
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(2000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("2"));
     });
     it("Should handle simple points per second increase with ETH & ERC20 Deposits", async () => {
       const { deposit, erc20Deployments } = await loadFixture(
@@ -323,42 +363,71 @@ describe("OmronDeposit", () => {
       );
       const [token1, token2] = erc20Deployments;
       let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(0);
-      await addAllowance(token1, owner, deposit, 1000);
-      await deposit.contract.deposit(token1.address, 1000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
+      await deposit.contract.deposit(token1.address, ethers.parseEther("1"));
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(1000);
-      await owner.sendTransaction({ to: deposit.address, value: 1000 });
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("1"));
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: ethers.parseEther("1"),
+      });
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(2000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("2"));
     });
-    it("Should handle points per second mutations with ETH deposits and withdrawals", async () => {
+    it("Should handle points per second with ETH deposits and withdrawals", async () => {
       const { deposit } = await loadFixture(deployDepositContractFixture);
       let info = await deposit.contract.getUserInfo(owner);
       await deposit.contract.setWithdrawalsEnabled(true);
-      expect(info.pointsPerSecond).to.equal(0);
-      await owner.sendTransaction({ to: deposit.address, value: 1000 });
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: ethers.parseEther("1"),
+      });
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(1000);
-      await deposit.contract.withdrawEther(1000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("1"));
+      await deposit.contract.withdrawEther(ethers.parseEther("1"));
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(0);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
     });
-    it("Should handle points per second mutations with ERC20 deposits and withdrawals", async () => {
+    it("Should handle points per second with ERC20 deposits and withdrawals", async () => {
       const { deposit, erc20Deployments } = await loadFixture(
         deployDepositContractFixture
       );
       const [token1, token2] = erc20Deployments;
       await deposit.contract.setWithdrawalsEnabled(true);
       let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(0);
-      await addAllowance(token1, owner, deposit, 1000);
-      await deposit.contract.deposit(token1.address, 1000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
+      await deposit.contract.deposit(token1.address, ethers.parseEther("1"));
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(1000);
-      await deposit.contract.withdraw(token1.address, 1000);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("1"));
+      await deposit.contract.withdraw(token1.address, ethers.parseEther("1"));
       info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerSecond).to.equal(0);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
+    });
+    it("Should handle points per second with ETH & ERC20 deposits and withdrawals", async () => {
+      const { deposit, erc20Deployments } = await loadFixture(
+        deployDepositContractFixture
+      );
+      const [token1] = erc20Deployments;
+      await deposit.contract.setWithdrawalsEnabled(true);
+      let info = await deposit.contract.getUserInfo(owner);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
+      await addAllowance(token1, owner, deposit, ethers.parseEther("1"));
+      await deposit.contract.deposit(token1.address, ethers.parseEther("1"));
+      info = await deposit.contract.getUserInfo(owner);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("1"));
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: ethers.parseEther("1"),
+      });
+      info = await deposit.contract.getUserInfo(owner);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("2"));
+      await deposit.contract.withdrawEther(ethers.parseEther("1"));
+      await deposit.contract.withdraw(token1.address, ethers.parseEther("1"));
+      info = await deposit.contract.getUserInfo(owner);
+      expect(info.pointsPerSecond).to.equal(ethers.parseEther("0"));
     });
   });
 });

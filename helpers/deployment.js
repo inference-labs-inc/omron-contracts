@@ -1,3 +1,4 @@
+import { ZeroAddress, ZeroHash } from "ethers";
 import fs from "fs";
 import hre from "hardhat";
 import { isEmpty, uniqueId } from "lodash-es";
@@ -7,6 +8,13 @@ import signale from "signale-logger";
 const deploymentLogger = new signale.Signale({
   stream: [process.stdout, fs.createWriteStream("deploy.log")],
   scope: "Deployment",
+  types: {
+    dry_run: {
+      badge: "🌵",
+      color: "yellow",
+      label: "Dry Run",
+    },
+  },
 });
 
 let deployedContracts = {};
@@ -22,17 +30,29 @@ const deployContract = async (contractName, args) => {
     contractName
   );
   try {
-    contractDeploymentLogger.await("Deploying...");
-
-    const contract = await hre.ethers.deployContract(
-      contractName,
-      ...(isEmpty(args) ? [] : [args])
-    );
-    const transactionHash = contract.deploymentTransaction().hash;
-    contractDeploymentLogger.info("Transaction Hash:", transactionHash);
-    await contract.waitForDeployment();
-    const contractAddress = await contract.getAddress();
-    contractDeploymentLogger.complete(`Deployed to ${contractAddress}`);
+    let contract, contractAddress, transactionHash;
+    if (process.env.DRY_RUN === "true") {
+      contractDeploymentLogger.dry_run(
+        "Contract",
+        contractName,
+        "would have been deployed with args",
+        args
+      );
+      contract = null;
+      contractAddress = ZeroAddress;
+      transactionHash = ZeroHash;
+    } else {
+      contractDeploymentLogger.await("Deploying...");
+      contract = await hre.ethers.deployContract(
+        contractName,
+        ...(isEmpty(args) ? [] : [args])
+      );
+      transactionHash = contract.deploymentTransaction().hash;
+      contractDeploymentLogger.info("Transaction Hash:", transactionHash);
+      await contract.waitForDeployment();
+      contractAddress = await contract.getAddress();
+      contractDeploymentLogger.complete(`Deployed to ${contractAddress}`);
+    }
     if (!isEmpty(deployedContracts[contractName])) {
       deployedContracts[contractName + " " + uniqueId()] = {
         contractAddress,

@@ -1,4 +1,3 @@
-import random from "lodash-es/random.js";
 import { deployContract } from "../../helpers/deployment.js";
 
 const deployDepositContractFixture = async (numberOfERC20 = 5) => {
@@ -6,7 +5,7 @@ const deployDepositContractFixture = async (numberOfERC20 = 5) => {
   const erc20Deployments = Array(numberOfERC20);
   for (let i = 0; i < numberOfERC20; i++) {
     erc20Deployments[i] = await deployContract("tstETH", [
-      random(1000, 10000000),
+      ethers.parseEther("1000000"),
     ]);
   }
 

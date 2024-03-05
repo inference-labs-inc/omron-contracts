@@ -26,6 +26,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
     // Variables
     bool public withdrawalsEnabled;
+    uint8 public constant pointsDecimals = 18;
 
     // Custom Errors
     error ZeroAddress();
@@ -36,10 +37,18 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error WithdrawalsDisabled();
 
     // Events
-    event Deposit(address from, address _tokenAddress, uint amount);
-    event Withdrawal(address to, address _tokenAddress, uint amount);
-    event EtherDeposit(address from, uint amount);
-    event EtherWithdrawal(address to, uint amount);
+    event Deposit(
+        address indexed from,
+        address indexed _tokenAddress,
+        uint256 amount
+    );
+    event Withdrawal(
+        address indexed to,
+        address indexed _tokenAddress,
+        uint256 amount
+    );
+    event EtherDeposit(address indexed from, uint256 amount);
+    event EtherWithdrawal(address indexed to, uint amount);
     event WithdrawalsEnabled(bool _enabled);
     event WhitelistedTokenAdded(address _tokenAddress);
 
@@ -86,14 +95,14 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev Pause the contract
      */
-    function pause() public onlyOwner {
+    function pause() external onlyOwner {
         _pause();
     }
 
     /**
      * @dev Unpause the contract
      */
-    function unpause() public onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
     }
 
@@ -109,16 +118,16 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         _;
     }
 
-    // Public view methods
+    // External view methods
 
     /**
-     * @notice A view method that returns deposit and point information about the provided address
-     * @param _userAddress The address of the user to check the information for.
+     * @notice A view method that returns point information about the provided address
+     * @param _userAddress The address of the user to check the point information for.
      */
     function getUserInfo(
         address _userAddress
     )
-        public
+        external
         view
         returns (
             uint256 pointsPerSecond,
@@ -136,7 +145,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     function calculatePoints(
         address _userAddress
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         UserInfo storage user = userInfo[_userAddress];
         uint256 timeElapsed = block.timestamp - user.lastUpdated;
         return timeElapsed * user.pointsPerSecond + user.pointBalance;
@@ -150,12 +159,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function tokenBalance(
         address _userAddress,
         address _tokenAddress
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         UserInfo storage user = userInfo[_userAddress];
         return user.tokenBalances[_tokenAddress];
     }
 
-    // Public methods
+    // External methods
 
     /**
      * @dev Deposit a token into the contract
@@ -254,5 +263,24 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             user.pointBalance += pointsEarned;
         }
         user.lastUpdated = block.timestamp;
+    }
+
+    /**
+     * Adjust the amount to 18 decimals
+     * @param _amount The amount to adjust
+     * @param tokenDecimals The number of decimals of the token
+     */
+    function _adjustAmountTo18Decimals(
+        uint256 _amount,
+        uint8 tokenDecimals
+    ) internal pure returns (uint256) {
+        if (tokenDecimals == 18) {
+            return _amount;
+        } else if (tokenDecimals < 18) {
+            return _amount * (10 ** (18 - tokenDecimals));
+        } else {
+            // Precision loss is acceptable
+            return _amount / (10 ** (tokenDecimals - 18));
+        }
     }
 }
