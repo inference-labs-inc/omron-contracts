@@ -24,3 +24,4 @@ artifacts
 deployments/localhost
 yarn-error.log
 ethereum-abi-types
+deploy.log

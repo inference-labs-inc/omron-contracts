@@ -40,6 +40,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     event Withdrawal(address to, address _tokenAddress, uint amount);
     event EtherDeposit(address from, uint amount);
     event EtherWithdrawal(address to, uint amount);
+    event WithdrawalsEnabled(bool _enabled);
+    event WhitelistedTokenAdded(address _tokenAddress);
 
     /**
      * @dev The constructor for the OmronDeposit contract.
@@ -64,9 +66,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @dev Add a new deposit token to the contract
      * @param _tokenAddress The address of the token to be added
      */
-    function addDepositToken(address _tokenAddress) external onlyOwner {
-        require(_tokenAddress != address(0), "OmronDeposit: zero address");
+    function addWhitelistedToken(address _tokenAddress) external onlyOwner {
+        if (_tokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
         whitelistedTokens[_tokenAddress] = true;
+        emit WhitelistedTokenAdded(_tokenAddress);
     }
 
     /**
@@ -75,6 +80,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     function setWithdrawalsEnabled(bool _enabled) external onlyOwner {
         withdrawalsEnabled = _enabled;
+        emit WithdrawalsEnabled(_enabled);
     }
 
     /**
@@ -106,14 +112,22 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Public view methods
 
     /**
-     * @notice A view method that returns the points per second for a user.
-     * @param _userAddress The address of the user to check the points per second for.
+     * @notice A view method that returns deposit and point information about the provided address
+     * @param _userAddress The address of the user to check the information for.
      */
-    function pointsPerSecond(
+    function getUserInfo(
         address _userAddress
-    ) public view returns (uint256) {
+    )
+        public
+        view
+        returns (
+            uint256 pointsPerSecond,
+            uint256 lastUpdated,
+            uint256 pointBalance
+        )
+    {
         UserInfo storage user = userInfo[_userAddress];
-        return user.pointsPerSecond;
+        return (user.pointsPerSecond, user.lastUpdated, user.pointBalance);
     }
 
     /**
@@ -161,7 +175,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (!sent) {
             revert TransferFailed();
         }
-        updatePoints(msg.sender);
+        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
         user.pointsPerSecond += _amount;
         user.tokenBalances[_tokenAddress] += _amount;
@@ -180,7 +194,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (whitelistedTokens[_tokenAddress] != true) {
             revert TokenNotWhitelisted();
         }
-        updatePoints(msg.sender);
+        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
         uint256 balance = user.tokenBalances[_tokenAddress];
         if (balance < _amount) {
@@ -200,7 +214,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @dev The receive function for the contract. Allows users to deposit ether into the contract.
      */
     receive() external payable nonReentrant whenNotPaused {
-        updatePoints(msg.sender);
+        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
         user.pointsPerSecond += msg.value;
         user.tokenBalances[address(0)] += msg.value;
@@ -214,7 +228,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function withdrawEther(
         uint _amount
     ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
-        updatePoints(msg.sender);
+        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
         uint256 balance = user.tokenBalances[address(0)];
         if (balance < _amount) {
@@ -232,7 +246,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @dev Update the points for a user
      * @param _userAddress The address of the user to update the points for
      */
-    function updatePoints(address _userAddress) internal {
+    function _updatePoints(address _userAddress) internal {
         UserInfo storage user = userInfo[_userAddress];
         if (user.lastUpdated != 0) {
             uint256 timeElapsed = block.timestamp - user.lastUpdated;

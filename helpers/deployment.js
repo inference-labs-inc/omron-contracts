@@ -1,8 +1,13 @@
+import fs from "fs";
 import hre from "hardhat";
 import { isEmpty, uniqueId } from "lodash-es";
+import logger from "not-a-log";
 import signale from "signale-logger";
 
-const deploymentLogger = signale.scope("Deployment");
+const deploymentLogger = new signale.Signale({
+  stream: [process.stdout, fs.createWriteStream("deploy.log")],
+  scope: "Deployment",
+});
 
 let deployedContracts = {};
 /**
@@ -17,7 +22,7 @@ const deployContract = async (contractName, args) => {
     contractName
   );
   try {
-    contractDeploymentLogger.await();
+    contractDeploymentLogger.await("Deploying...");
 
     const contract = await hre.ethers.deployContract(
       contractName,
@@ -44,6 +49,7 @@ const deployContract = async (contractName, args) => {
 };
 
 const logDeployedContracts = () => {
-  console.table(deployedContracts);
+  const table = logger.table(deployedContracts);
+  deploymentLogger.info("Deployed Contracts:\r\n" + table);
 };
 export { deployContract, deploymentLogger, logDeployedContracts };
