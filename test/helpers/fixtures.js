@@ -14,9 +14,13 @@ const deployDepositContractFixture = async (numberOfERC20 = 5) => {
     owner.address,
     erc20Deployments.map((deployment) => deployment.address),
   ]);
+
+  const nonWhitelistedToken = await deployContract("tstETH", [10000]);
+
   return {
-    contract,
+    deposit: contract,
     erc20Deployments,
+    nonWhitelistedToken,
   };
 };
 

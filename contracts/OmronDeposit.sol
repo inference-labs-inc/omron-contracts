@@ -21,7 +21,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     // Mappings
-    mapping(address => bool) public acceptedDepositCurrencies;
+    mapping(address => bool) public whitelistedTokens;
     mapping(address => UserInfo) public userInfo;
 
     // Variables
@@ -29,7 +29,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
     // Custom Errors
     error ZeroAddress();
-    error CurrencyNotAccepted();
+    error TokenNotWhitelisted();
     error InsufficientAllowance();
     error InsufficientBalance();
     error TransferFailed();
@@ -44,18 +44,18 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev The constructor for the OmronDeposit contract.
      * @param _initialOwner The address of the initial owner of the contract.
-     * @param _acceptedDepositCurrencies An array of addresses of tokens that are accepted by the contract.
+     * @param _whitelistedTokens An array of addresses of tokens that are accepted by the contract.
      */
     constructor(
         address _initialOwner,
-        address[] memory _acceptedDepositCurrencies
+        address[] memory _whitelistedTokens
     ) Ownable(_initialOwner) {
-        for (uint256 i = 0; i < _acceptedDepositCurrencies.length; i++) {
-            address token = _acceptedDepositCurrencies[i];
+        for (uint256 i = 0; i < _whitelistedTokens.length; i++) {
+            address token = _whitelistedTokens[i];
             if (token == address(0)) {
                 revert ZeroAddress();
             }
-            acceptedDepositCurrencies[token] = true;
+            whitelistedTokens[token] = true;
         }
     }
 
@@ -66,15 +66,29 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     function addDepositToken(address _tokenAddress) external onlyOwner {
         require(_tokenAddress != address(0), "OmronDeposit: zero address");
-        acceptedDepositCurrencies[_tokenAddress] = true;
+        whitelistedTokens[_tokenAddress] = true;
     }
 
     /**
      * @dev Set the withdrawals enabled state of the contract
-     * @param _enabled The new state of the withdrawals enabled state
+     * @param _enabled The new state of withdrawals enabled
      */
     function setWithdrawalsEnabled(bool _enabled) external onlyOwner {
         withdrawalsEnabled = _enabled;
+    }
+
+    /**
+     * @dev Pause the contract
+     */
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @dev Unpause the contract
+     */
+    function unpause() public onlyOwner {
+        _unpause();
     }
 
     // Modiifiers
@@ -138,8 +152,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _tokenAddress,
         uint _amount
     ) external nonReentrant whenNotPaused {
-        if (acceptedDepositCurrencies[_tokenAddress] != true) {
-            revert CurrencyNotAccepted();
+        if (whitelistedTokens[_tokenAddress] != true) {
+            revert TokenNotWhitelisted();
         }
         IERC20 token = IERC20(_tokenAddress);
 
@@ -163,8 +177,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _tokenAddress,
         uint _amount
     ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
-        if (acceptedDepositCurrencies[_tokenAddress] != true) {
-            revert CurrencyNotAccepted();
+        if (whitelistedTokens[_tokenAddress] != true) {
+            revert TokenNotWhitelisted();
         }
         updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
