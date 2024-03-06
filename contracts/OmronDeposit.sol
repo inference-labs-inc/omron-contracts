@@ -218,7 +218,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert TransferFailed();
         }
         user.tokenBalances[_tokenAddress] -= _amount;
-        user.pointsPerSecond -= _amount;
+        user.pointsPerSecond -= _adjustAmountTo18Decimals(
+            _amount,
+            token.decimals()
+        );
         emit Withdrawal(msg.sender, _tokenAddress, _amount);
     }
 
