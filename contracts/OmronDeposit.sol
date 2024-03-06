@@ -193,14 +193,15 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (whitelistedTokens[_tokenAddress] != true) {
             revert TokenNotWhitelisted();
         }
-        IERC20Min token = IERC20Min(_tokenAddress);
 
+        IERC20Min token = IERC20Min(_tokenAddress);
         bool sent = token.transferFrom(msg.sender, address(this), _amount);
         if (!sent) {
             revert TransferFailed();
         }
-        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
+        _updatePoints(user);
+
         user.pointsPerSecond += _adjustAmountTo18Decimals(
             _amount,
             token.decimals()
@@ -221,8 +222,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (whitelistedTokens[_tokenAddress] != true) {
             revert TokenNotWhitelisted();
         }
-        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
+        _updatePoints(user);
+
         uint256 balance = user.tokenBalances[_tokenAddress];
         if (balance < _amount) {
             revert InsufficientBalance();
@@ -244,8 +246,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @dev The receive function for the contract. Allows users to deposit ether into the contract.
      */
     receive() external payable nonReentrant whenNotPaused {
-        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
+        _updatePoints(user);
+
         user.pointsPerSecond += msg.value;
         user.tokenBalances[address(0)] += msg.value;
         emit EtherDeposit(msg.sender, msg.value);
@@ -258,8 +261,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function withdrawEther(
         uint _amount
     ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
-        _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
+        _updatePoints(user);
+
         uint256 balance = user.tokenBalances[address(0)];
         if (balance < _amount) {
             revert InsufficientBalance();
@@ -273,17 +277,16 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Internal functions
 
     /**
-     * @dev Update the points for a user
-     * @param _userAddress The address of the user to update the points for
+     * @dev Update points information for a user
+     * @param _user The user to update the points for
      */
-    function _updatePoints(address _userAddress) internal {
-        UserInfo storage user = userInfo[_userAddress];
-        if (user.lastUpdated != 0) {
-            uint256 timeElapsed = block.timestamp - user.lastUpdated;
-            uint256 pointsEarned = timeElapsed * user.pointsPerSecond;
-            user.pointBalance += pointsEarned;
+    function _updatePoints(UserInfo storage _user) internal {
+        if (_user.lastUpdated != 0) {
+            uint256 timeElapsed = block.timestamp - _user.lastUpdated;
+            uint256 pointsEarned = timeElapsed * _user.pointsPerSecond;
+            _user.pointBalance += pointsEarned;
         }
-        user.lastUpdated = block.timestamp;
+        _user.lastUpdated = block.timestamp;
     }
 
     /**

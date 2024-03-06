@@ -517,5 +517,24 @@ describe("OmronDeposit", () => {
       userInfo = await deposit.contract.getUserInfo(owner.address);
       expect(userInfo.pointBalance).to.equal(parseEther("3"));
     });
+    it("Should handle complex deposits and withdrawals", async () => {
+      let userInfo = await deposit.contract.getUserInfo(owner.address);
+      await deposit.contract.setWithdrawalsEnabled(true);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+      await addAllowance(token1, owner, deposit, parseEther("1"));
+      await deposit.contract.deposit(token1.address, parseEther("1"));
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: parseEther("1"),
+      }); // Balance should be 1x1 = 1, Points per second should be 2
+      await deposit.contract.withdraw(token1.address, parseEther("1")); // Balance should be 1x2 = 2 + 1 = 3, Points per second should be 1
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: parseEther("1"),
+      }); // Balance should be 1x1 = 1 + 3 = 4, Points per second should be 2
+      userInfo = await deposit.contract.getUserInfo(owner.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("4"));
+      expect(userInfo.pointsPerSecond).to.equal(parseEther("2"));
+    });
   });
 });
