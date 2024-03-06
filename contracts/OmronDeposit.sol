@@ -27,6 +27,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Variables
     bool public withdrawalsEnabled;
     uint8 public constant pointsDecimals = 18;
+    address[] public allWhitelistedTokens;
 
     // Custom Errors
     error ZeroAddress();
@@ -67,6 +68,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
                 revert ZeroAddress();
             }
             whitelistedTokens[token] = true;
+            allWhitelistedTokens.push(token);
         }
     }
 
@@ -80,6 +82,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert ZeroAddress();
         }
         whitelistedTokens[_tokenAddress] = true;
+        allWhitelistedTokens.push(_tokenAddress);
         emit WhitelistedTokenAdded(_tokenAddress);
     }
 
@@ -137,6 +140,18 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     {
         UserInfo storage user = userInfo[_userAddress];
         return (user.pointsPerSecond, user.lastUpdated, user.pointBalance);
+    }
+
+    /**
+     * @notice A view method that returns the list of all whitelisted tokens.
+     * @return An array of addresses of all whitelisted tokens.
+     */
+    function getAllWhitelistedTokens()
+        external
+        view
+        returns (address[] memory)
+    {
+        return allWhitelistedTokens;
     }
 
     /**
