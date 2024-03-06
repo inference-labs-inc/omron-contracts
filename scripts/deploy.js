@@ -30,6 +30,7 @@ async function main() {
     for (let i = 0; i < 5; i++) {
       erc20Deployments[i] = await deployContract("tstETH", [
         ethers.parseEther("1000000"),
+        18,
       ]);
     }
     tokenAddresses = erc20Deployments.map((d) => d.address);
