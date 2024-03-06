@@ -473,4 +473,30 @@ describe("OmronDeposit", () => {
       expect(calculatedPoints2).to.equal(parseEther("1"));
     });
   });
+  describe("pointBalance", () => {
+    it("Should correctly increase points with a simple ETH deposit", async () => {
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: parseEther("1"),
+      });
+      await time.increase(1);
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: parseEther("1"),
+      });
+      const userInfo = await deposit.contract.getUserInfo(owner.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("2"));
+    });
+    it("Should correctly increase points with a simple ERC20 deposit", async () => {
+      let userInfo = await deposit.contract.getUserInfo(owner.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+      await addAllowance(token1, owner, deposit, parseEther("1"));
+      await deposit.contract.deposit(token1.address, parseEther("1"));
+      // These two txs get automined, block time increases by 2
+      await addAllowance(token1, owner, deposit, parseEther("1"));
+      await deposit.contract.deposit(token1.address, parseEther("1"));
+      userInfo = await deposit.contract.getUserInfo(owner.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("2"));
+    });
+  });
 });
