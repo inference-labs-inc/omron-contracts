@@ -195,11 +195,14 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         }
 
         IERC20Min token = IERC20Min(_tokenAddress);
+
         bool sent = token.transferFrom(msg.sender, address(this), _amount);
         if (!sent) {
             revert TransferFailed();
         }
+
         UserInfo storage user = userInfo[msg.sender];
+
         _updatePoints(user);
 
         user.pointsPerSecond += _adjustAmountTo18Decimals(
@@ -207,6 +210,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             token.decimals()
         );
         user.tokenBalances[_tokenAddress] += _amount;
+
         emit Deposit(msg.sender, _tokenAddress, _amount);
     }
 
@@ -222,6 +226,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (whitelistedTokens[_tokenAddress] != true) {
             revert TokenNotWhitelisted();
         }
+
         UserInfo storage user = userInfo[msg.sender];
         _updatePoints(user);
 
@@ -229,16 +234,20 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (balance < _amount) {
             revert InsufficientBalance();
         }
+
         IERC20Min token = IERC20Min(_tokenAddress);
+
         bool sent = token.transfer(msg.sender, _amount);
         if (!sent) {
             revert TransferFailed();
         }
+
         user.tokenBalances[_tokenAddress] -= _amount;
         user.pointsPerSecond -= _adjustAmountTo18Decimals(
             _amount,
             token.decimals()
         );
+
         emit Withdrawal(msg.sender, _tokenAddress, _amount);
     }
 
@@ -247,10 +256,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     receive() external payable nonReentrant whenNotPaused {
         UserInfo storage user = userInfo[msg.sender];
+
         _updatePoints(user);
 
         user.pointsPerSecond += msg.value;
         user.tokenBalances[address(0)] += msg.value;
+
         emit EtherDeposit(msg.sender, msg.value);
     }
 
@@ -262,15 +273,19 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         uint _amount
     ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
         UserInfo storage user = userInfo[msg.sender];
+
         _updatePoints(user);
 
         uint256 balance = user.tokenBalances[address(0)];
         if (balance < _amount) {
             revert InsufficientBalance();
         }
+
         payable(msg.sender).transfer(_amount);
+
         user.tokenBalances[address(0)] -= _amount;
         user.pointsPerSecond -= _amount;
+
         emit EtherWithdrawal(msg.sender, _amount);
     }
 
