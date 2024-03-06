@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Min} from "./interfaces/IERC20Min.sol";
 
 /**
  * @title OmronDeposit
@@ -178,7 +178,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (whitelistedTokens[_tokenAddress] != true) {
             revert TokenNotWhitelisted();
         }
-        IERC20 token = IERC20(_tokenAddress);
+        IERC20Min token = IERC20Min(_tokenAddress);
 
         bool sent = token.transferFrom(msg.sender, address(this), _amount);
         if (!sent) {
@@ -186,7 +186,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         }
         _updatePoints(msg.sender);
         UserInfo storage user = userInfo[msg.sender];
-        user.pointsPerSecond += _amount;
+        user.pointsPerSecond += _adjustAmountTo18Decimals(
+            _amount,
+            token.decimals()
+        );
         user.tokenBalances[_tokenAddress] += _amount;
         emit Deposit(msg.sender, _tokenAddress, _amount);
     }
@@ -209,7 +212,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         if (balance < _amount) {
             revert InsufficientBalance();
         }
-        IERC20 token = IERC20(_tokenAddress);
+        IERC20Min token = IERC20Min(_tokenAddress);
         bool sent = token.transfer(msg.sender, _amount);
         if (!sent) {
             revert TransferFailed();
