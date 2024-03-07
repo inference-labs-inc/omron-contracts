@@ -123,7 +123,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address[] memory _whitelistedTokens
     ) Ownable(_initialOwner) {
         uint256 length = _whitelistedTokens.length;
-        for (uint256 i; i < length; ++i) {
+        for (uint256 i; i < length; ) {
             address token = _whitelistedTokens[i];
             if (token == address(0)) {
                 revert ZeroAddress();
@@ -131,6 +131,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             whitelistedTokens[token] = true;
             allWhitelistedTokens.push(token);
             emit WhitelistedTokenAdded(token);
+            unchecked {
+                ++i;
+            }
         }
     }
 

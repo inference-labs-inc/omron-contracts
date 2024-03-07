@@ -36,6 +36,39 @@ describe("OmronDeposit", () => {
         deployContract("OmronDeposit", [owner.address, [ZeroAddress]])
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
+    it("Should emit events for each whitelisted token", async () => {
+      const tokenAddresses = [
+        ...[...erc20Deployments].map((x) => x.address),
+        token6decimals.address,
+        token20decimals.address,
+      ];
+
+      const txHash = deposit.hash;
+      const tx = await ethers.provider.getTransaction(txHash);
+      console.log(tx);
+      const receipt = await ethers.provider.getTransactionReceipt(txHash);
+      console.log(receipt);
+      const events = receipt.logs.map((x) =>
+        deposit.contract.interface.parseLog(x)
+      );
+      console.log(events);
+      const whitelistedTokenEvents = events.filter(
+        (x) => x.name === "WhitelistedTokenAdded"
+      );
+      expect(whitelistedTokenEvents).to.have.lengthOf(tokenAddresses.length);
+      const whitelistedTokenAddresses = whitelistedTokenEvents.map(
+        (x) => x.args[0]
+      );
+      expect(whitelistedTokenAddresses).to.have.members(tokenAddresses);
+    });
+    it("Should whitelist tokens as expected", async () => {
+      const whitelist = await deposit.contract.getAllWhitelistedTokens();
+      expect([...whitelist]).to.have.members([
+        ...erc20Deployments.map((x) => x.address),
+        token6decimals.address,
+        token20decimals.address,
+      ]);
+    });
   });
   describe("getAllWhitelistedTokens", () => {
     it("Should return all whitelisted tokens", async () => {

@@ -61,7 +61,7 @@ const deployContract = async (contractName, args) => {
     } else {
       deployedContracts[contractName] = { contractAddress, transactionHash };
     }
-    return { contract, address: contractAddress };
+    return { contract, address: contractAddress, hash: transactionHash };
   } catch (e) {
     contractDeploymentLogger.error(`Failed to deploy ${contractName}\n`, e);
     throw e;
