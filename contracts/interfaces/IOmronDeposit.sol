@@ -12,7 +12,7 @@ interface IOmronDeposit {
      * @dev UserInfo struct contains mappings for token balances and variables for point tracking
      */
     struct UserInfo {
-        mapping(address => uint256) tokenBalances; // Mapping of token addresses to their respective balances for a user
+        mapping(address tokenAddress => uint256 balanceAmount) tokenBalances; // Mapping of token addresses to their respective balances for a user
         uint256 pointBalance; // Total points balance of the user
         uint256 pointsPerSecond; // Rate at which the user earns points per second
         uint256 lastUpdated; // Timestamp of the last update to user's points
