@@ -25,3 +25,6 @@ deployments/localhost
 yarn-error.log
 ethereum-abi-types
 deploy.log
+.scribble*
+venv/
+report.md

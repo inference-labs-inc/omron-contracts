@@ -190,7 +190,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _tokenAddress,
         uint _amount
     ) external nonReentrant whenNotPaused {
-        if (whitelistedTokens[_tokenAddress] != true) {
+        if (!whitelistedTokens[_tokenAddress]) {
             revert TokenNotWhitelisted();
         }
 
@@ -205,7 +205,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         _updatePoints(user);
 
-        user.pointsPerSecond += _adjustAmountTo18Decimals(
+        user.pointsPerSecond += _adjustAmountToPoints(
             _amount,
             token.decimals()
         );
@@ -223,7 +223,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _tokenAddress,
         uint _amount
     ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
-        if (whitelistedTokens[_tokenAddress] != true) {
+        if (!whitelistedTokens[_tokenAddress]) {
             revert TokenNotWhitelisted();
         }
 
@@ -238,7 +238,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         _updatePoints(user);
         user.tokenBalances[_tokenAddress] -= _amount;
-        user.pointsPerSecond -= _adjustAmountTo18Decimals(
+        user.pointsPerSecond -= _adjustAmountToPoints(
             _amount,
             token.decimals()
         );
@@ -304,21 +304,21 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * Adjust the amount to 18 decimals
+     * Adjust the amount to a points value, based on the token's decimals and the points decimals
      * @param _amount The amount to adjust
      * @param tokenDecimals The number of decimals of the token
      */
-    function _adjustAmountTo18Decimals(
+    function _adjustAmountToPoints(
         uint256 _amount,
         uint8 tokenDecimals
     ) internal pure returns (uint256) {
-        if (tokenDecimals == 18) {
+        if (tokenDecimals == pointsDecimals) {
             return _amount;
-        } else if (tokenDecimals < 18) {
-            return _amount * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals < pointsDecimals) {
+            return _amount * (10 ** (pointsDecimals - tokenDecimals));
         } else {
             // Precision loss is acceptable
-            return _amount / (10 ** (tokenDecimals - 18));
+            return _amount / (10 ** (tokenDecimals - pointsDecimals));
         }
     }
 }

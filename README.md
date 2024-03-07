@@ -67,14 +67,10 @@ The user of the contract is the depositor of the contract. The user has the foll
 - Withdraw ETH when not paused, withdrawals enabled
 - Access read methods
 
-## Incident Response
-
-### Pause
+## Incident Response Process
 
 In the event of any emergency situation within the contract, defined as:
 
-- A bug is found
-- A vulnerability is found
 - A security incident occurs
 - A critical issue is found
 
