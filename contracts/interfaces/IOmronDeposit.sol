@@ -62,29 +62,32 @@ interface IOmronDeposit {
 
     /**
      * @notice Returns a list of all whitelisted tokens
-     * @return An array of addresses of whitelisted tokens
+     * @return _allWhitelistedTokens An array of addresses of whitelisted tokens
      */
-    function getAllWhitelistedTokens() external view returns (address[] memory);
+    function getAllWhitelistedTokens()
+        external
+        view
+        returns (address[] memory _allWhitelistedTokens);
 
     /**
      * @notice Calculates the total points earned by a user
      * @param _userAddress The address of the user
-     * @return The total points earned by the user
+     * @return currentPointsBalance The total points earned by the user
      */
     function calculatePoints(
         address _userAddress
-    ) external view returns (uint256);
+    ) external view returns (uint256 currentPointsBalance);
 
     /**
      * @notice Returns the token balance of a user for a specific token
      * @param _userAddress The address of the user
      * @param _tokenAddress The address of the token
-     * @return The token balance of the user
+     * @return balance The token balance of the user
      */
     function tokenBalance(
         address _userAddress,
         address _tokenAddress
-    ) external view returns (uint256);
+    ) external view returns (uint256 balance);
 
     /**
      * @notice Returns detailed user information including points per second, last updated timestamp, and point balance

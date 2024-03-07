@@ -211,39 +211,44 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice A view method that returns the list of all whitelisted tokens.
-     * @return An array of addresses of all whitelisted tokens.
+     * @return _allWhitelistedTokens An array of addresses of all whitelisted tokens.
      */
     function getAllWhitelistedTokens()
         external
         view
-        returns (address[] memory)
+        returns (address[] memory _allWhitelistedTokens)
     {
-        return allWhitelistedTokens;
+        _allWhitelistedTokens = allWhitelistedTokens;
     }
 
     /**
      * @notice A view method that calculates the points earned by a user.
      * @param _userAddress The address of the user to calculate the points for.
+     * @return currentPointsBalance The total points earned by the user, including points earned from time elapsed since the last update.
      */
     function calculatePoints(
         address _userAddress
-    ) external view returns (uint256) {
+    ) external view returns (uint256 currentPointsBalance) {
         UserInfo storage user = userInfo[_userAddress];
         uint256 timeElapsed = block.timestamp - user.lastUpdated;
-        return timeElapsed * user.pointsPerSecond + user.pointBalance;
+        currentPointsBalance =
+            timeElapsed *
+            user.pointsPerSecond +
+            user.pointBalance;
     }
 
     /**
      * @notice A view method that returns the token balance for a user.
      * @param _userAddress The address of the user to check the token balance for.
      * @param _tokenAddress The address of the token to check the balance for.
+     * @return balance The token balance of the user for the specified token.
      */
     function tokenBalance(
         address _userAddress,
         address _tokenAddress
-    ) external view returns (uint256) {
+    ) external view returns (uint256 balance) {
         UserInfo storage user = userInfo[_userAddress];
-        return user.tokenBalances[_tokenAddress];
+        balance = user.tokenBalances[_tokenAddress];
     }
 
     // External methods
