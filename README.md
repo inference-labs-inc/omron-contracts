@@ -44,4 +44,45 @@ pnpm test:debug
 pnpm deploy
 ```
 
+## Actors, Roles and Privileges
+
+### Owner
+
+The owner of the contract is the deployer of the contract. The owner has the following privileges:
+
+- Pause the contract
+- Unpause the contract
+- Change the owner
+- Renounce ownership
+- Allow withdrawals of ERC20s and ETH
+- Disable withdrawals of ERC20s and ETH
+
+### User (Anyone)
+
+The user of the contract is the depositor of the contract. The user has the following privileges:
+
+- Deposit ERC20s when not paused
+- Deposit ETH when not paused
+- Withdraw ERC20s when not paused, withdrawals enabled
+- Withdraw ETH when not paused, withdrawals enabled
+- Access read methods
+
+## Incident Response
+
+### Pause
+
+In the event of any emergency situation within the contract, defined as:
+
+- A bug is found
+- A vulnerability is found
+- A security incident occurs
+- A critical issue is found
+
+The contract owner shall immediately:
+
+- Pause the contract
+- Investigate the issue
+- Fix the issue or take necessary steps to mitigate the issue
+- Unpause the contract
+
 [`hardhat-tracer`]: https://github.com/zemse/hardhat-tracer "Hardhat Tracer GitHub Repo"
