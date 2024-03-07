@@ -382,18 +382,23 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * Adjust the amount to a points value, based on the token's decimals and the points decimals
      * @param _amount The amount to adjust
      * @param tokenDecimals The number of decimals of the token
+     * @return adjustedAmount The amount adjusted to a points value
      */
     function _adjustAmountToPoints(
         uint256 _amount,
         uint8 tokenDecimals
-    ) private pure returns (uint256) {
+    ) private pure returns (uint256 adjustedAmount) {
         if (tokenDecimals == POINTS_DECIMALS) {
-            return _amount;
+            adjustedAmount = _amount;
         } else if (tokenDecimals < POINTS_DECIMALS) {
-            return _amount * (10 ** (POINTS_DECIMALS - tokenDecimals));
+            adjustedAmount =
+                _amount *
+                (10 ** (POINTS_DECIMALS - tokenDecimals));
         } else {
             // Precision loss is acceptable
-            return _amount / (10 ** (tokenDecimals - POINTS_DECIMALS));
+            adjustedAmount =
+                _amount /
+                (10 ** (tokenDecimals - POINTS_DECIMALS));
         }
     }
 }
