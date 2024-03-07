@@ -13,38 +13,49 @@ interface IOmronDeposit {
     // Events
     event Deposit(
         address indexed from,
-        address indexed _tokenAddress,
-        uint amount
+        address indexed tokenAddress,
+        uint256 amount
     );
     event Withdrawal(
         address indexed to,
-        address indexed _tokenAddress,
-        uint amount
+        address indexed tokenAddress,
+        uint256 amount
     );
-    event EtherDeposit(address indexed from, uint amount);
-    event EtherWithdrawal(address indexed to, uint amount);
+    event EtherDeposit(address indexed from, uint256 amount);
+    event EtherWithdrawal(address indexed to, uint256 amount);
+    event WithdrawalsEnabled(bool enabled);
+    event WhitelistedTokenAdded(address tokenAddress);
 
     // Functions
-    function addDepositToken(address _tokenAddress) external;
+    function addWhitelistedToken(address tokenAddress) external;
 
-    function setWithdrawalsEnabled(bool _enabled) external;
+    function setWithdrawalsEnabled(bool enabled) external;
 
-    function pointsPerSecond(
-        address _userAddress
-    ) external view returns (uint256);
+    function getUserInfo(
+        address userAddress
+    )
+        external
+        view
+        returns (
+            uint256 pointsPerSecond,
+            uint256 lastUpdated,
+            uint256 pointBalance
+        );
+
+    function getAllWhitelistedTokens() external view returns (address[] memory);
 
     function calculatePoints(
-        address _userAddress
+        address userAddress
     ) external view returns (uint256);
 
     function tokenBalance(
-        address _userAddress,
-        address _tokenAddress
+        address userAddress,
+        address tokenAddress
     ) external view returns (uint256);
 
-    function deposit(address _tokenAddress, uint _amount) external;
+    function deposit(address tokenAddress, uint256 amount) external;
 
-    function withdraw(address _tokenAddress, uint _amount) external;
+    function withdraw(address tokenAddress, uint256 amount) external;
 
-    function withdrawEther(uint _amount) external;
+    function withdrawEther(uint256 amount) external;
 }
