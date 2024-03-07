@@ -99,7 +99,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @param to The address of the user that withdrew the ether
      * @param amount The amount of ether that was withdrawn
      */
-    event EtherWithdrawal(address indexed to, uint amount);
+    event EtherWithdrawal(address indexed to, uint256 amount);
 
     /**
      * Emitted when the withdrawals enabled state of the contract is changed
