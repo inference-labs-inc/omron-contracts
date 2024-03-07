@@ -14,6 +14,9 @@ import {IERC20Min} from "./interfaces/IERC20Min.sol";
  */
 contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Structs
+    /**
+     * @notice A struct that holds information about a user's points and token balances
+     */
     struct UserInfo {
         mapping(address tokenAddress => uint256 balanceAmount) tokenBalances;
         uint256 pointBalance;
@@ -22,13 +25,33 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     // Mappings
+
+    /**
+     * @notice A mapping of whitelisted tokens to a boolean indicating if the token is whitelisted
+     */
     mapping(address tokenAddress => bool isWhitelisted)
         public whitelistedTokens;
-    mapping(address userAddress => UserInfo pointsInformation) public userInfo;
+
+    /**
+     * @notice A mapping of user addresses to information about the user including points and token balances
+     */
+    mapping(address userAddress => UserInfo userInformation) public userInfo;
 
     // Variables
+
+    /**
+     * @notice A boolean that indicates if withdrawals are enabled
+     */
     bool public withdrawalsEnabled;
+
+    /**
+     * @notice The number of decimal places for points
+     */
     uint8 public constant POINTS_DECIMALS = 18;
+
+    /**
+     * @notice An array of addresses of all whitelisted tokens
+     */
     address[] public allWhitelistedTokens;
 
     // Custom Errors
@@ -39,19 +62,55 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error WithdrawalsDisabled();
 
     // Events
+
+    /**
+     * Emitted when a user deposits ERC20 tokens into the contract
+     * @param from The address of the user that deposited the tokens
+     * @param tokenAddress The address of the token that was deposited
+     * @param amount The amount of the token that was deposited
+     */
     event Deposit(
         address indexed from,
-        address indexed _tokenAddress,
+        address indexed tokenAddress,
         uint256 amount
     );
+
+    /**
+     * Emitted when a user withdraws ERC20 tokens from the contract
+     * @param to The address of the user that withdrew the tokens
+     * @param tokenAddress The address of the token that was withdrawn
+     * @param amount The amount of the token that was withdrawn
+     */
     event Withdrawal(
         address indexed to,
-        address indexed _tokenAddress,
+        address indexed tokenAddress,
         uint256 amount
     );
+
+    /**
+     * Emitted when a user deposits ether into the contract
+     * @param from The address of the user that deposited the ether
+     * @param amount The amount of ether that was deposited
+     */
     event EtherDeposit(address indexed from, uint256 amount);
+
+    /**
+     * Emitted when a user withdraws ether from the contract
+     * @param to The address of the user that withdrew the ether
+     * @param amount The amount of ether that was withdrawn
+     */
     event EtherWithdrawal(address indexed to, uint amount);
+
+    /**
+     * Emitted when the withdrawals enabled state of the contract is changed
+     * @param _enabled The new state of withdrawals enabled
+     */
     event WithdrawalsEnabled(bool indexed _enabled);
+
+    /**
+     * Emitted when a new token is added to the whitelist
+     * @param _tokenAddress The address of the token that was added to the whitelist
+     */
     event WhitelistedTokenAdded(address indexed _tokenAddress);
 
     /**
@@ -129,6 +188,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice A view method that returns point information about the provided address
      * @param _userAddress The address of the user to check the point information for.
+     * @return pointsPerSecond The number of points earned per second by the user.
+     * @return lastUpdated The timestamp of the last time the user's points were updated.
+     * @return pointBalance The total number of points earned by the user.
      */
     function getUserInfo(
         address _userAddress
@@ -142,7 +204,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         )
     {
         UserInfo storage user = userInfo[_userAddress];
-        return (user.pointsPerSecond, user.lastUpdated, user.pointBalance);
+        pointsPerSecond = user.pointsPerSecond;
+        lastUpdated = user.lastUpdated;
+        pointBalance = user.pointBalance;
     }
 
     /**
@@ -191,7 +255,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     function deposit(
         address _tokenAddress,
-        uint _amount
+        uint256 _amount
     ) external nonReentrant whenNotPaused {
         if (!whitelistedTokens[_tokenAddress]) {
             revert TokenNotWhitelisted();
@@ -224,7 +288,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     function withdraw(
         address _tokenAddress,
-        uint _amount
+        uint256 _amount
     ) external nonReentrant whenWithdrawalsEnabled {
         if (!whitelistedTokens[_tokenAddress]) {
             revert TokenNotWhitelisted();
@@ -273,7 +337,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @param _amount The amount of ether to be withdrawn
      */
     function withdrawEther(
-        uint _amount
+        uint256 _amount
     ) external nonReentrant whenWithdrawalsEnabled {
         UserInfo storage user = userInfo[msg.sender];
 
