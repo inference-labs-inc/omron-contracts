@@ -1,92 +1,97 @@
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
-
 /**
  * @title Interface for OmronDeposit Contract
- * @dev Interface for the OmronDeposit contract, defining the essential functions and events for interacting with the OmronDeposit system.
+ * @notice This interface outlines the functions and events for the OmronDeposit contract, which allows users to deposit tokens and earn points.
+ * @custom:security-contact whitehat@inferencelabs.com
  */
 interface IOmronDeposit {
     /**
-     * @dev Struct to store user information including token balances, point balance, points per second, and last updated timestamp.
+     * @notice Struct to store user information including token balances and points
+     * @dev UserInfo struct contains mappings for token balances and variables for point tracking
      */
     struct UserInfo {
-        mapping(address => uint256) tokenBalances; // Mapping of token addresses to their respective balances for a user.
-        uint256 pointBalance; // The total points balance of the user.
-        uint256 pointsPerSecond; // The rate at which the user earns points per second.
-        uint256 lastUpdated; // The last timestamp when the user's points were updated.
+        mapping(address => uint256) tokenBalances; // Mapping of token addresses to their respective balances for a user
+        uint256 pointBalance; // Total points balance of the user
+        uint256 pointsPerSecond; // Rate at which the user earns points per second
+        uint256 lastUpdated; // Timestamp of the last update to user's points
     }
 
     /**
-     * @dev Emitted when a deposit is made.
-     * @param from The address making the deposit.
-     * @param tokenAddress The address of the token being deposited.
-     * @param amount The amount of tokens deposited.
+     * @notice Deposits a specified amount of a token into the contract
+     * @param _tokenAddress The address of the token to deposit
+     * @param _amount The amount of the token to deposit
      */
-    event Deposit(
-        address indexed from,
-        address indexed tokenAddress,
-        uint256 amount
-    );
+    function deposit(address _tokenAddress, uint256 _amount) external;
 
     /**
-     * @dev Emitted when a withdrawal is made.
-     * @param to The address making the withdrawal.
-     * @param tokenAddress The address of the token being withdrawn.
-     * @param amount The amount of tokens withdrawn.
+     * @notice Withdraws a specified amount of a token from the contract
+     * @param _tokenAddress The address of the token to withdraw
+     * @param _amount The amount of the token to withdraw
      */
-    event Withdrawal(
-        address indexed to,
-        address indexed tokenAddress,
-        uint256 amount
-    );
+    function withdraw(address _tokenAddress, uint256 _amount) external;
 
     /**
-     * @dev Emitted when an Ether deposit is made.
-     * @param from The address making the deposit.
-     * @param amount The amount of Ether deposited.
+     * @notice Withdraws a specified amount of Ether from the contract
+     * @param _amount The amount of Ether to withdraw
      */
-    event EtherDeposit(address indexed from, uint256 amount);
+    function withdrawEther(uint256 _amount) external;
 
     /**
-     * @dev Emitted when an Ether withdrawal is made.
-     * @param to The address making the withdrawal.
-     * @param amount The amount of Ether withdrawn.
+     * @notice Adds a token to the list of whitelisted tokens
+     * @param _tokenAddress The address of the token to whitelist
      */
-    event EtherWithdrawal(address indexed to, uint256 amount);
+    function addWhitelistedToken(address _tokenAddress) external;
 
     /**
-     * @dev Emitted when withdrawals are enabled or disabled.
-     * @param enabled Boolean indicating the new state of withdrawals.
+     * @notice Enables or disables withdrawals from the contract
+     * @param _enabled Boolean indicating whether withdrawals should be enabled
      */
-    event WithdrawalsEnabled(bool enabled);
+    function setWithdrawalsEnabled(bool _enabled) external;
 
     /**
-     * @dev Emitted when a new token is added to the whitelist.
-     * @param tokenAddress The address of the token being whitelisted.
+     * @notice Pauses the contract, disabling deposits
      */
-    event WhitelistedTokenAdded(address tokenAddress);
+    function pause() external;
 
     /**
-     * @dev Adds a new token to the whitelist.
-     * @param tokenAddress The address of the token to be whitelisted.
+     * @notice Unpauses the contract, enabling deposits
      */
-    function addWhitelistedToken(address tokenAddress) external;
+    function unpause() external;
 
     /**
-     * @dev Enables or disables withdrawals.
-     * @param enabled Boolean indicating the desired state of withdrawals.
+     * @notice Returns a list of all whitelisted tokens
+     * @return An array of addresses of whitelisted tokens
      */
-    function setWithdrawalsEnabled(bool enabled) external;
+    function getAllWhitelistedTokens() external view returns (address[] memory);
 
     /**
-     * @dev Retrieves user information.
-     * @param userAddress The address of the user.
-     * @return pointsPerSecond The rate at which the user earns points per second.
-     * @return lastUpdated The last timestamp when the user's points were updated.
-     * @return pointBalance The total points balance of the user.
+     * @notice Calculates the total points earned by a user
+     * @param _userAddress The address of the user
+     * @return The total points earned by the user
+     */
+    function calculatePoints(
+        address _userAddress
+    ) external view returns (uint256);
+
+    /**
+     * @notice Returns the token balance of a user for a specific token
+     * @param _userAddress The address of the user
+     * @param _tokenAddress The address of the token
+     * @return The token balance of the user
+     */
+    function tokenBalance(
+        address _userAddress,
+        address _tokenAddress
+    ) external view returns (uint256);
+
+    /**
+     * @notice Returns detailed user information including points per second, last updated timestamp, and point balance
+     * @param _userAddress The address of the user
+     * @return pointsPerSecond The rate at which the user earns points per second
+     * @return lastUpdated The timestamp of the last update to user's points
+     * @return pointBalance The total points balance of the user
      */
     function getUserInfo(
-        address userAddress
+        address _userAddress
     )
         external
         view
@@ -96,49 +101,54 @@ interface IOmronDeposit {
             uint256 pointBalance
         );
 
+    // Events
     /**
-     * @dev Retrieves all whitelisted tokens.
-     * @return An array of addresses of all whitelisted tokens.
+     * @dev Emitted when a user deposits ERC20 tokens into the contract
+     * @param from The address of the user that deposited the tokens
+     * @param tokenAddress The address of the token that was deposited
+     * @param amount The amount of the token that was deposited
      */
-    function getAllWhitelistedTokens() external view returns (address[] memory);
+    event Deposit(
+        address indexed from,
+        address indexed tokenAddress,
+        uint256 amount
+    );
 
     /**
-     * @dev Calculates the total points earned by a user.
-     * @param userAddress The address of the user.
-     * @return The total points earned by the user.
+     * @dev Emitted when a user withdraws ERC20 tokens from the contract
+     * @param to The address of the user that withdrew the tokens
+     * @param tokenAddress The address of the token that was withdrawn
+     * @param amount The amount of the token that was withdrawn
      */
-    function calculatePoints(
-        address userAddress
-    ) external view returns (uint256);
+    event Withdrawal(
+        address indexed to,
+        address indexed tokenAddress,
+        uint256 amount
+    );
 
     /**
-     * @dev Retrieves the token balance for a user.
-     * @param userAddress The address of the user.
-     * @param tokenAddress The address of the token.
-     * @return The balance of the specified token for the user.
+     * @dev Emitted when a user deposits Ether into the contract
+     * @param from The address of the user that deposited the Ether
+     * @param amount The amount of Ether that was deposited
      */
-    function tokenBalance(
-        address userAddress,
-        address tokenAddress
-    ) external view returns (uint256);
+    event EtherDeposit(address indexed from, uint256 amount);
 
     /**
-     * @dev Deposits tokens into the system.
-     * @param tokenAddress The address of the token to deposit.
-     * @param amount The amount of tokens to deposit.
+     * @dev Emitted when a user withdraws Ether from the contract
+     * @param to The address of the user that withdrew the Ether
+     * @param amount The amount of Ether that was withdrawn
      */
-    function deposit(address tokenAddress, uint256 amount) external;
+    event EtherWithdrawal(address indexed to, uint256 amount);
 
     /**
-     * @dev Withdraws tokens from the system.
-     * @param tokenAddress The address of the token to withdraw.
-     * @param amount The amount of tokens to withdraw.
+     * @dev Emitted when the withdrawals enabled state is changed
+     * @param _enabled The new state of withdrawals enabled
      */
-    function withdraw(address tokenAddress, uint256 amount) external;
+    event WithdrawalsEnabled(bool indexed _enabled);
 
     /**
-     * @dev Withdraws Ether from the system.
-     * @param amount The amount of Ether to withdraw.
+     * @dev Emitted when a new token is added to the whitelist
+     * @param _tokenAddress The address of the token that was whitelisted
      */
-    function withdrawEther(uint256 amount) external;
+    event WhitelistedTokenAdded(address indexed _tokenAddress);
 }

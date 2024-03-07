@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+/**
+ * @title Minimal Interface for ERC20 Tokens
+ * @author Inference Labs
+ * @custom:security-contact whitehat@inferencelabs.com
+ * @notice Minimal Interface for ERC20 Tokens
+ */
 interface IERC20Min {
     /**
      * @dev Moves a `value` amount of tokens from the caller's account to `to`.
