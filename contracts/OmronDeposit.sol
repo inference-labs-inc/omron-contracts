@@ -8,31 +8,32 @@ import {IERC20Min} from "./interfaces/IERC20Min.sol";
 /**
  * @title OmronDeposit
  * @author Inference Labs
+ * @custom:security-contact security@inferencelabs.com
  * @notice A contract that allows users to deposit tokens and earn points based on the amount of time the tokens are held in the contract.
  * @dev Users can deposit any token that is accepted by the contract. The contract will track the amount of time the tokens are held in the contract and award points based on the amount of time the tokens are held.
  */
 contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Structs
     struct UserInfo {
-        mapping(address => uint256) tokenBalances;
+        mapping(address tokenAddress => uint256 balanceAmount) tokenBalances;
         uint256 pointBalance;
         uint256 pointsPerSecond;
         uint256 lastUpdated;
     }
 
     // Mappings
-    mapping(address => bool) public whitelistedTokens;
-    mapping(address => UserInfo) public userInfo;
+    mapping(address tokenAddress => bool isWhitelisted)
+        public whitelistedTokens;
+    mapping(address userAddress => UserInfo pointsInformation) public userInfo;
 
     // Variables
     bool public withdrawalsEnabled;
-    uint8 public constant pointsDecimals = 18;
+    uint8 public constant POINTS_DECIMALS = 18;
     address[] public allWhitelistedTokens;
 
     // Custom Errors
     error ZeroAddress();
     error TokenNotWhitelisted();
-    error InsufficientAllowance();
     error InsufficientBalance();
     error TransferFailed();
     error WithdrawalsDisabled();
@@ -50,8 +51,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     );
     event EtherDeposit(address indexed from, uint256 amount);
     event EtherWithdrawal(address indexed to, uint amount);
-    event WithdrawalsEnabled(bool _enabled);
-    event WhitelistedTokenAdded(address _tokenAddress);
+    event WithdrawalsEnabled(bool indexed _enabled);
+    event WhitelistedTokenAdded(address indexed _tokenAddress);
 
     /**
      * @dev The constructor for the OmronDeposit contract.
@@ -62,13 +63,15 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _initialOwner,
         address[] memory _whitelistedTokens
     ) Ownable(_initialOwner) {
-        for (uint256 i = 0; i < _whitelistedTokens.length; i++) {
+        uint256 length = _whitelistedTokens.length;
+        for (uint256 i; i < length; ++i) {
             address token = _whitelistedTokens[i];
             if (token == address(0)) {
                 revert ZeroAddress();
             }
             whitelistedTokens[token] = true;
             allWhitelistedTokens.push(token);
+            emit WhitelistedTokenAdded(token);
         }
     }
 
@@ -109,7 +112,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         _unpause();
     }
 
-    // Modiifiers
+    // Modifiers
 
     /**
      * A@dev modifier that checks if withdrawals are enabled
@@ -222,7 +225,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function withdraw(
         address _tokenAddress,
         uint _amount
-    ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
+    ) external nonReentrant whenWithdrawalsEnabled {
         if (!whitelistedTokens[_tokenAddress]) {
             revert TokenNotWhitelisted();
         }
@@ -271,7 +274,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     function withdrawEther(
         uint _amount
-    ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
+    ) external nonReentrant whenWithdrawalsEnabled {
         UserInfo storage user = userInfo[msg.sender];
 
         uint256 balance = user.tokenBalances[address(0)];
@@ -283,7 +286,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         user.tokenBalances[address(0)] -= _amount;
         user.pointsPerSecond -= _amount;
 
-        payable(msg.sender).transfer(_amount);
+        (bool sent, ) = msg.sender.call{value: _amount}("");
+        if (!sent) {
+            revert TransferFailed();
+        }
 
         emit EtherWithdrawal(msg.sender, _amount);
     }
@@ -294,7 +300,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @dev Update points information for a user
      * @param _user The user to update the points for
      */
-    function _updatePoints(UserInfo storage _user) internal {
+    function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
             uint256 pointsEarned = timeElapsed * _user.pointsPerSecond;
@@ -311,14 +317,14 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function _adjustAmountToPoints(
         uint256 _amount,
         uint8 tokenDecimals
-    ) internal pure returns (uint256) {
-        if (tokenDecimals == pointsDecimals) {
+    ) private pure returns (uint256) {
+        if (tokenDecimals == POINTS_DECIMALS) {
             return _amount;
-        } else if (tokenDecimals < pointsDecimals) {
-            return _amount * (10 ** (pointsDecimals - tokenDecimals));
+        } else if (tokenDecimals < POINTS_DECIMALS) {
+            return _amount * (10 ** (POINTS_DECIMALS - tokenDecimals));
         } else {
             // Precision loss is acceptable
-            return _amount / (10 ** (tokenDecimals - pointsDecimals));
+            return _amount / (10 ** (tokenDecimals - POINTS_DECIMALS));
         }
     }
 }

@@ -143,14 +143,22 @@ describe("OmronDeposit", () => {
     });
   });
   describe("withdrawEther", () => {
-    it("Should reject withdraw when paused", async () => {
+    it("Should not reject withdraw when paused", async () => {
+      await user1.sendTransaction({
+        to: deposit.address,
+        value: parseEther("1"),
+      });
       await expect(deposit.contract.connect(owner).pause())
         .to.emit(deposit.contract, "Paused")
         .withArgs(owner.address);
 
+      await deposit.contract.setWithdrawalsEnabled(true);
+
       await expect(
         deposit.contract.connect(user1).withdrawEther(parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
+      )
+        .to.emit(deposit.contract, "EtherWithdrawal")
+        .withArgs(user1.address, parseEther("1"));
     });
     it("Should reject withdraw with no balance", async () => {
       await deposit.contract.setWithdrawalsEnabled(true);
@@ -220,8 +228,14 @@ describe("OmronDeposit", () => {
         deposit.contract.withdraw(brokenERC20.address, parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "TransferFailed");
     });
-    it("Should reject withdraw when paused", async () => {
-      await expect(deposit.contract.connect(owner).pause())
+    it("Should accept withdraw when paused", async () => {
+      await deposit.contract.setWithdrawalsEnabled(true);
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await deposit.contract
+        .connect(user1)
+        .deposit(token1.address, parseEther("1"));
+      await expect(deposit.contract.pause())
         .to.emit(deposit.contract, "Paused")
         .withArgs(owner.address);
 
@@ -229,7 +243,9 @@ describe("OmronDeposit", () => {
         deposit.contract
           .connect(user1)
           .withdraw(token1.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
+      )
+        .to.emit(deposit.contract, "Withdrawal")
+        .withArgs(user1.address, token1.address, parseEther("1"));
     });
     it("Should reject withdraw with no balance", async () => {
       await deposit.contract.setWithdrawalsEnabled(true);
@@ -246,6 +262,23 @@ describe("OmronDeposit", () => {
           .connect(owner)
           .withdraw(token1.address, parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "WithdrawalsDisabled");
+    });
+    it("Should reject non-whitelisted token", async () => {
+      await deposit.contract.setWithdrawalsEnabled(true);
+      await expect(
+        deposit.contract
+          .connect(owner)
+          .withdraw(nonWhitelistedToken.address, parseEther("1"))
+      ).to.be.revertedWithCustomError(deposit.contract, "TokenNotWhitelisted");
+    });
+
+    it("Should accept valid withdraw", async () => {
+      await deposit.contract.setWithdrawalsEnabled(true);
+      await addAllowance(token1, owner, deposit, parseEther("1"));
+      await deposit.contract.deposit(token1.address, parseEther("1"));
+      await expect(deposit.contract.withdraw(token1.address, parseEther("1")))
+        .to.emit(deposit.contract, "Withdrawal")
+        .withArgs(owner.address, token1.address, parseEther("1"));
     });
   });
   describe("deposit", () => {
@@ -302,50 +335,6 @@ describe("OmronDeposit", () => {
           .connect(owner)
           .deposit(nonWhitelistedToken.address, parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "TokenNotWhitelisted");
-    });
-  });
-  describe("withdraw", () => {
-    it("Should reject non-whitelisted token", async () => {
-      await deposit.contract.setWithdrawalsEnabled(true);
-      await expect(
-        deposit.contract
-          .connect(owner)
-          .withdraw(nonWhitelistedToken.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "TokenNotWhitelisted");
-    });
-    it("Should reject withdraw when paused", async () => {
-      await expect(deposit.contract.connect(owner).pause())
-        .to.emit(deposit.contract, "Paused")
-        .withArgs(owner.address);
-      await expect(
-        deposit.contract
-          .connect(user1)
-          .withdraw(token1.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
-    });
-    it("Should reject withdraw with no balance", async () => {
-      await deposit.contract.setWithdrawalsEnabled(true);
-      await expect(
-        deposit.contract
-          .connect(user1)
-          .withdraw(token1.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "InsufficientBalance");
-    });
-    it("Should reject withdraw when withdrawals disabled", async () => {
-      await addAllowance(token1, owner, deposit, parseEther("1"));
-      await expect(
-        deposit.contract
-          .connect(owner)
-          .withdraw(token1.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "WithdrawalsDisabled");
-    });
-    it("Should accept valid withdraw", async () => {
-      await deposit.contract.setWithdrawalsEnabled(true);
-      await addAllowance(token1, owner, deposit, parseEther("1"));
-      await deposit.contract.deposit(token1.address, parseEther("1"));
-      await expect(deposit.contract.withdraw(token1.address, parseEther("1")))
-        .to.emit(deposit.contract, "Withdrawal")
-        .withArgs(owner.address, token1.address, parseEther("1"));
     });
   });
   describe("tokenBalance", () => {
