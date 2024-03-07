@@ -1,6 +1,7 @@
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { parseEther, parseUnits } from "ethers";
+import { ZeroAddress, parseEther, parseUnits } from "ethers";
+import { deployContract } from "../helpers/deployment.js";
 import { deployDepositContractFixture } from "./helpers/fixtures.js";
 import { addAllowance } from "./helpers/utils.js";
 
@@ -16,7 +17,8 @@ describe("OmronDeposit", () => {
     token2,
     nonWhitelistedToken,
     token6decimals,
-    token20decimals;
+    token20decimals,
+    brokenERC20;
   beforeEach(async () => {
     ({
       deposit,
@@ -24,8 +26,16 @@ describe("OmronDeposit", () => {
       nonWhitelistedToken,
       token6decimals,
       token20decimals,
+      brokenERC20,
     } = await loadFixture(deployDepositContractFixture));
     [token1, token2] = erc20Deployments;
+  });
+  describe("constructor", () => {
+    it("Should revert with zeroaddress if any whitelisted token is zero address", async () => {
+      await expect(
+        deployContract("OmronDeposit", [owner.address, [ZeroAddress]])
+      ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
+    });
   });
   describe("getAllWhitelistedTokens", () => {
     it("Should return all whitelisted tokens", async () => {
@@ -175,6 +185,41 @@ describe("OmronDeposit", () => {
     });
   });
   describe("withdraw", () => {
+    it("Should defend against reentrancy attack", async () => {
+      await deposit.contract.setWithdrawalsEnabled(true);
+
+      const reentrancyAttack = await deployContract("ReentrancyAttack", [
+        deposit.address,
+      ]);
+      await owner.sendTransaction({
+        to: reentrancyAttack.address,
+        value: parseEther("200"),
+      });
+      await reentrancyAttack.contract.deposit(parseEther("1"));
+      await reentrancyAttack.contract.recursiveAttack(parseEther("1"));
+      const balanceOfReentrancyAttack = await ethers.provider.getBalance(
+        reentrancyAttack.address
+      );
+      expect(balanceOfReentrancyAttack).to.equal(parseEther("200"));
+
+      await expect(
+        reentrancyAttack.contract.attack(parseEther("1"))
+      ).to.be.revertedWithCustomError(
+        reentrancyAttack.contract,
+        "AttackFailed"
+      );
+    });
+    it("Should reject withdraw when transferFrom is falsy", async () => {
+      await addAllowance(brokenERC20, owner, deposit, parseEther("1"));
+      await deposit.contract.addWhitelistedToken(brokenERC20.address);
+      await deposit.contract.setWithdrawalsEnabled(true);
+      await brokenERC20.contract.setTransfersEnabled(true);
+      await deposit.contract.deposit(brokenERC20.address, parseEther("1"));
+      await brokenERC20.contract.setTransfersEnabled(false);
+      await expect(
+        deposit.contract.withdraw(brokenERC20.address, parseEther("1"))
+      ).to.be.revertedWithCustomError(deposit.contract, "TransferFailed");
+    });
     it("Should reject withdraw when paused", async () => {
       await expect(deposit.contract.connect(owner).pause())
         .to.emit(deposit.contract, "Paused")
@@ -213,10 +258,21 @@ describe("OmronDeposit", () => {
         deposit.contract.connect(user1).deposit(token1.address, parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
-    it("Should reject deposit with no allowance", async () => {
-      expect(
-        deposit.contract.deposit(token1.address, parseEther("1"))
+    it("Should handle falsy transferFrom response", async () => {
+      await addAllowance(brokenERC20, owner, deposit, parseEther("1"));
+      await deposit.contract.addWhitelistedToken(brokenERC20.address);
+      await brokenERC20.contract.setTransfersEnabled(false);
+      await expect(
+        deposit.contract.deposit(brokenERC20.address, parseEther("1"))
       ).to.be.revertedWithCustomError(deposit.contract, "TransferFailed");
+    });
+    it("Should reject deposit with no allowance", async () => {
+      await expect(
+        deposit.contract.deposit(token1.address, parseEther("1"))
+      ).to.be.revertedWithCustomError(
+        token1.contract,
+        "ERC20InsufficientAllowance"
+      );
     });
     it("Should reject deposit with empty balance", async () => {
       await addAllowance(token1, user2, deposit, parseEther("1"));
@@ -249,6 +305,14 @@ describe("OmronDeposit", () => {
     });
   });
   describe("withdraw", () => {
+    it("Should reject non-whitelisted token", async () => {
+      await deposit.contract.setWithdrawalsEnabled(true);
+      await expect(
+        deposit.contract
+          .connect(owner)
+          .withdraw(nonWhitelistedToken.address, parseEther("1"))
+      ).to.be.revertedWithCustomError(deposit.contract, "TokenNotWhitelisted");
+    });
     it("Should reject withdraw when paused", async () => {
       await expect(deposit.contract.connect(owner).pause())
         .to.emit(deposit.contract, "Paused")
@@ -284,7 +348,34 @@ describe("OmronDeposit", () => {
         .withArgs(owner.address, token1.address, parseEther("1"));
     });
   });
+  describe("tokenBalance", () => {
+    it("Should correctly return ERC20 token balance", async () => {
+      await addAllowance(token1, owner, deposit, parseEther("1"));
+      await deposit.contract.deposit(token1.address, parseEther("1"));
+      const balance = await deposit.contract.tokenBalance(
+        owner.address,
+        token1.address
+      );
+      expect(balance).to.equal(parseEther("1"));
+    });
+    it("Should correctly return ETH balance", async () => {
+      await owner.sendTransaction({
+        to: deposit.address,
+        value: parseEther("1"),
+      });
+      const balance = await deposit.contract.tokenBalance(
+        owner.address,
+        ZeroAddress
+      );
+      expect(balance).to.equal(parseEther("1"));
+    });
+  });
   describe("addWhitelistedToken", () => {
+    it("Should reject token at zero address", async () => {
+      await expect(
+        deposit.contract.connect(owner).addWhitelistedToken(ZeroAddress)
+      ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
+    });
     it("Should reject addWhitelistedToken when not owner", async () => {
       await expect(
         deposit.contract

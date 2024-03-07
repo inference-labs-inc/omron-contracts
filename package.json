@@ -8,6 +8,8 @@
     "test": "REPORT_GAS=true hardhat test",
     "test:debug": "REPORT_GAS=true hardhat test --show-stack-traces --fulltrace --vv --opcodes MUL,DIV,ADD,SUB,REVERT",
     "dev": "REPORT_GAS=true hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "REPORT_GAS=true hardhat run scripts/deploy.js --network sepolia",
+    "deploy:mainnet": "REPORT_GAS=true hardhat run scripts/deploy.js --network mainnet",
     "types": "abi-types-generator hardhat"
   },
   "keywords": [

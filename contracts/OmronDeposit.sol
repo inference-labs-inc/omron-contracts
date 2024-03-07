@@ -228,7 +228,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         }
 
         UserInfo storage user = userInfo[msg.sender];
-        _updatePoints(user);
 
         uint256 balance = user.tokenBalances[_tokenAddress];
         if (balance < _amount) {
@@ -237,16 +236,17 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         IERC20Min token = IERC20Min(_tokenAddress);
 
-        bool sent = token.transfer(msg.sender, _amount);
-        if (!sent) {
-            revert TransferFailed();
-        }
-
+        _updatePoints(user);
         user.tokenBalances[_tokenAddress] -= _amount;
         user.pointsPerSecond -= _adjustAmountTo18Decimals(
             _amount,
             token.decimals()
         );
+
+        bool sent = token.transfer(msg.sender, _amount);
+        if (!sent) {
+            revert TransferFailed();
+        }
 
         emit Withdrawal(msg.sender, _tokenAddress, _amount);
     }
@@ -274,17 +274,16 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     ) external nonReentrant whenNotPaused whenWithdrawalsEnabled {
         UserInfo storage user = userInfo[msg.sender];
 
-        _updatePoints(user);
-
         uint256 balance = user.tokenBalances[address(0)];
         if (balance < _amount) {
             revert InsufficientBalance();
         }
 
-        payable(msg.sender).transfer(_amount);
-
+        _updatePoints(user);
         user.tokenBalances[address(0)] -= _amount;
         user.pointsPerSecond -= _amount;
+
+        payable(msg.sender).transfer(_amount);
 
         emit EtherWithdrawal(msg.sender, _amount);
     }

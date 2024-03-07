@@ -23,6 +23,10 @@ const deployDepositContractFixture = async (numberOfERC20 = 5) => {
     20,
   ]);
 
+  const brokenERC20 = await deployContract("BrokenERC20", [
+    ethers.parseEther("1000000"),
+  ]);
+
   const contract = await deployContract("OmronDeposit", [
     owner.address,
     erc20Deployments
@@ -36,6 +40,7 @@ const deployDepositContractFixture = async (numberOfERC20 = 5) => {
     nonWhitelistedToken,
     token6decimals,
     token20decimals,
+    brokenERC20,
   };
 };
 

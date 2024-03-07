@@ -25,7 +25,7 @@ async function main() {
   const wallets = await hre.ethers.getSigners(10);
   // Deploy contracts here using deployContract
   let tokenAddresses = tokens[hre.network.name];
-  if (hre.network.name === "localhost") {
+  if (hre.network.name === "localhost" || hre.network.name === "sepolia") {
     const erc20Deployments = [];
     for (let i = 0; i < 5; i++) {
       erc20Deployments[i] = await deployContract("tstETH", [
