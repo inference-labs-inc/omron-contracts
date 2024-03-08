@@ -20,7 +20,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     struct UserInfo {
         mapping(address tokenAddress => uint256 balanceAmount) tokenBalances;
         uint256 pointBalance;
-        uint256 pointsPerSecond;
+        uint256 pointsPerHour;
         uint256 lastUpdated;
     }
 
@@ -86,20 +86,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address indexed tokenAddress,
         uint256 amount
     );
-
-    /**
-     * Emitted when a user deposits ether into the contract
-     * @param from The address of the user that deposited the ether
-     * @param amount The amount of ether that was deposited
-     */
-    event EtherDeposit(address indexed from, uint256 amount);
-
-    /**
-     * Emitted when a user withdraws ether from the contract
-     * @param to The address of the user that withdrew the ether
-     * @param amount The amount of ether that was withdrawn
-     */
-    event EtherWithdrawal(address indexed to, uint256 amount);
 
     /**
      * Emitted when the withdrawals enabled state of the contract is changed
@@ -191,7 +177,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice A view method that returns point information about the provided address
      * @param _userAddress The address of the user to check the point information for.
-     * @return pointsPerSecond The number of points earned per second by the user.
+     * @return pointsPerHour The number of points earned per hour by the user.
      * @return lastUpdated The timestamp of the last time the user's points were updated.
      * @return pointBalance The total number of points earned by the user.
      */
@@ -201,13 +187,13 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         external
         view
         returns (
-            uint256 pointsPerSecond,
+            uint256 pointsPerHour,
             uint256 lastUpdated,
             uint256 pointBalance
         )
     {
         UserInfo storage user = userInfo[_userAddress];
-        pointsPerSecond = user.pointsPerSecond;
+        pointsPerHour = user.pointsPerHour;
         lastUpdated = user.lastUpdated;
         pointBalance = user.pointBalance;
     }
@@ -234,10 +220,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     ) external view returns (uint256 currentPointsBalance) {
         UserInfo storage user = userInfo[_userAddress];
         uint256 timeElapsed = block.timestamp - user.lastUpdated;
-        currentPointsBalance =
-            timeElapsed *
-            user.pointsPerSecond +
-            user.pointBalance;
+        uint256 hoursElapsed = (timeElapsed * 10 ** POINTS_DECIMALS) / 3600;
+        uint256 pointsEarned = (hoursElapsed * user.pointsPerHour) /
+            10 ** POINTS_DECIMALS;
+        currentPointsBalance = pointsEarned + user.pointBalance;
     }
 
     /**
@@ -280,10 +266,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         _updatePoints(user);
 
-        user.pointsPerSecond += _adjustAmountToPoints(
-            _amount,
-            token.decimals()
-        );
+        user.pointsPerHour += _adjustAmountToPoints(_amount, token.decimals());
         user.tokenBalances[_tokenAddress] += _amount;
 
         emit Deposit(msg.sender, _tokenAddress, _amount);
@@ -313,10 +296,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         _updatePoints(user);
         user.tokenBalances[_tokenAddress] -= _amount;
-        user.pointsPerSecond -= _adjustAmountToPoints(
-            _amount,
-            token.decimals()
-        );
+        user.pointsPerHour -= _adjustAmountToPoints(_amount, token.decimals());
 
         bool sent = token.transfer(msg.sender, _amount);
         if (!sent) {
@@ -324,46 +304,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         }
 
         emit Withdrawal(msg.sender, _tokenAddress, _amount);
-    }
-
-    /**
-     * @dev The receive function for the contract. Allows users to deposit ether into the contract.
-     */
-    receive() external payable nonReentrant whenNotPaused {
-        UserInfo storage user = userInfo[msg.sender];
-
-        _updatePoints(user);
-
-        user.pointsPerSecond += msg.value;
-        user.tokenBalances[address(0)] += msg.value;
-
-        emit EtherDeposit(msg.sender, msg.value);
-    }
-
-    /**
-     * @dev Withdraw ether from the contract
-     * @param _amount The amount of ether to be withdrawn
-     */
-    function withdrawEther(
-        uint256 _amount
-    ) external nonReentrant whenWithdrawalsEnabled {
-        UserInfo storage user = userInfo[msg.sender];
-
-        uint256 balance = user.tokenBalances[address(0)];
-        if (balance < _amount) {
-            revert InsufficientBalance();
-        }
-
-        _updatePoints(user);
-        user.tokenBalances[address(0)] -= _amount;
-        user.pointsPerSecond -= _amount;
-
-        (bool sent, ) = msg.sender.call{value: _amount}("");
-        if (!sent) {
-            revert TransferFailed();
-        }
-
-        emit EtherWithdrawal(msg.sender, _amount);
     }
 
     // Internal functions
@@ -375,7 +315,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
-            uint256 pointsEarned = timeElapsed * _user.pointsPerSecond;
+            uint256 hoursElapsed = (timeElapsed * 10 ** 18) / 3600;
+            uint256 pointsEarned = (hoursElapsed * _user.pointsPerHour) /
+                10 ** 18;
             _user.pointBalance += pointsEarned;
         }
         _user.lastUpdated = block.timestamp;
