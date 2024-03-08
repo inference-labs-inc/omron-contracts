@@ -220,9 +220,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     ) external view returns (uint256 currentPointsBalance) {
         UserInfo storage user = userInfo[_userAddress];
         uint256 timeElapsed = block.timestamp - user.lastUpdated;
-        uint256 hoursElapsed = (timeElapsed * 10 ** POINTS_DECIMALS) / 3600;
-        uint256 pointsEarned = (hoursElapsed * user.pointsPerHour) /
-            10 ** POINTS_DECIMALS;
+        uint256 pointsEarned = (timeElapsed *
+            user.pointsPerHour *
+            10 ** POINTS_DECIMALS) / (3600 * 10 ** POINTS_DECIMALS);
         currentPointsBalance = pointsEarned + user.pointBalance;
     }
 
@@ -257,17 +257,17 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         IERC20Min token = IERC20Min(_tokenAddress);
 
-        bool sent = token.transferFrom(msg.sender, address(this), _amount);
-        if (!sent) {
-            revert TransferFailed();
-        }
-
         UserInfo storage user = userInfo[msg.sender];
 
         _updatePoints(user);
 
         user.pointsPerHour += _adjustAmountToPoints(_amount, token.decimals());
         user.tokenBalances[_tokenAddress] += _amount;
+
+        bool sent = token.transferFrom(msg.sender, address(this), _amount);
+        if (!sent) {
+            revert TransferFailed();
+        }
 
         emit Deposit(msg.sender, _tokenAddress, _amount);
     }
@@ -315,9 +315,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
-            uint256 hoursElapsed = (timeElapsed * 10 ** 18) / 3600;
-            uint256 pointsEarned = (hoursElapsed * _user.pointsPerHour) /
-                10 ** 18;
+            uint256 pointsEarned = (timeElapsed *
+                _user.pointsPerHour *
+                10 ** 18) / (3600 * 10 ** 18);
             _user.pointBalance += pointsEarned;
         }
         _user.lastUpdated = block.timestamp;
