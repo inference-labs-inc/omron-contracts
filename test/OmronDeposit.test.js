@@ -161,7 +161,10 @@ describe("OmronDeposit", () => {
       await brokenERC20.contract.setTransfersEnabled(false);
       await expect(
         deposit.contract.withdraw(brokenERC20.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "TransferFailed");
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "SafeERC20FailedOperation"
+      );
     });
     it("Should accept withdraw when paused", async () => {
       await deposit.contract.setWithdrawalsEnabled(true);
@@ -232,7 +235,10 @@ describe("OmronDeposit", () => {
       await brokenERC20.contract.setTransfersEnabled(false);
       await expect(
         deposit.contract.deposit(brokenERC20.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(deposit.contract, "TransferFailed");
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "SafeERC20FailedOperation"
+      );
     });
     it("Should reject deposit with no allowance", async () => {
       await expect(

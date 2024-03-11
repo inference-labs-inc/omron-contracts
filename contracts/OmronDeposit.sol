@@ -3,7 +3,11 @@ pragma solidity 0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {IERC20Min} from "./interfaces/IERC20Min.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+using SafeERC20 for IERC20Metadata;
 
 /**
  * @title OmronDeposit
@@ -58,7 +62,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error ZeroAddress();
     error TokenNotWhitelisted();
     error InsufficientBalance();
-    error TransferFailed();
     error WithdrawalsDisabled();
 
     // Events
@@ -255,7 +258,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert TokenNotWhitelisted();
         }
 
-        IERC20Min token = IERC20Min(_tokenAddress);
+        IERC20Metadata token = IERC20Metadata(_tokenAddress);
 
         UserInfo storage user = userInfo[msg.sender];
 
@@ -264,10 +267,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         user.pointsPerHour += _adjustAmountToPoints(_amount, token.decimals());
         user.tokenBalances[_tokenAddress] += _amount;
 
-        bool sent = token.transferFrom(msg.sender, address(this), _amount);
-        if (!sent) {
-            revert TransferFailed();
-        }
+        token.safeTransferFrom(msg.sender, address(this), _amount);
 
         emit Deposit(msg.sender, _tokenAddress, _amount);
     }
@@ -292,16 +292,13 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert InsufficientBalance();
         }
 
-        IERC20Min token = IERC20Min(_tokenAddress);
+        IERC20Metadata token = IERC20Metadata(_tokenAddress);
 
         _updatePoints(user);
         user.tokenBalances[_tokenAddress] -= _amount;
         user.pointsPerHour -= _adjustAmountToPoints(_amount, token.decimals());
 
-        bool sent = token.transfer(msg.sender, _amount);
-        if (!sent) {
-            revert TransferFailed();
-        }
+        token.safeTransfer(msg.sender, _amount);
 
         emit Withdrawal(msg.sender, _tokenAddress, _amount);
     }
