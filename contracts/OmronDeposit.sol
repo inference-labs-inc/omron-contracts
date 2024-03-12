@@ -63,6 +63,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error TokenNotWhitelisted();
     error InsufficientBalance();
     error WithdrawalsDisabled();
+    error ZeroAmount();
 
     // Events
 
@@ -254,6 +255,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _tokenAddress,
         uint256 _amount
     ) external nonReentrant whenNotPaused {
+        if (_amount == 0) {
+            revert ZeroAmount();
+        }
+
         if (!whitelistedTokens[_tokenAddress]) {
             revert TokenNotWhitelisted();
         }
@@ -281,6 +286,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _tokenAddress,
         uint256 _amount
     ) external nonReentrant whenWithdrawalsEnabled {
+        if (_amount == 0) {
+            revert ZeroAmount();
+        }
+
         if (!whitelistedTokens[_tokenAddress]) {
             revert TokenNotWhitelisted();
         }

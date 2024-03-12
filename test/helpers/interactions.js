@@ -1,11 +1,18 @@
+import { expect } from "chai";
+
+export const addAllowance = async (token, owner, spender, amount) => {
+  const action = token.contract.connect(owner).approve(spender.address, amount);
+  await expect(action).to.emit(token.contract, "Approval");
+};
+
 export const depositTokens = async (
+  deposit,
   token,
   amount,
   depositor = owner,
   shouldRevert = false,
   revertMessage = ""
 ) => {
-  await addAllowance(token, depositor, deposit, amount);
   const action = deposit.contract
     .connect(depositor)
     .deposit(token.address, amount);
@@ -22,6 +29,7 @@ export const depositTokens = async (
 };
 
 export const withdrawTokens = async (
+  deposit,
   token,
   amount,
   withdrawer = owner,
