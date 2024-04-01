@@ -452,7 +452,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
             // If the exit start time is before the current time, then use it to determine time elapsed,
             // since no points are being accrued after exit start
-            if (exitStartTime < block.timestamp) {
+            if (exitStartTime < block.timestamp && exitStartTime != 0) {
                 timeElapsed = exitStartTime - _user.lastUpdated;
             }
             uint256 pointsEarned = (timeElapsed *
