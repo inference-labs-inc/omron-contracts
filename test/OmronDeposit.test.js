@@ -20,18 +20,10 @@ describe("OmronDeposit", () => {
     token1,
     token2,
     nonWhitelistedToken,
-    token6decimals,
-    token20decimals,
     brokenERC20;
   beforeEach(async () => {
-    ({
-      deposit,
-      erc20Deployments,
-      nonWhitelistedToken,
-      token6decimals,
-      token20decimals,
-      brokenERC20,
-    } = await loadFixture(deployDepositContractFixture));
+    ({ deposit, erc20Deployments, nonWhitelistedToken, brokenERC20 } =
+      await loadFixture(deployDepositContractFixture));
     [token1, token2] = erc20Deployments;
   });
   describe("constructor", () => {
@@ -41,11 +33,7 @@ describe("OmronDeposit", () => {
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
     it("Should emit events for each whitelisted token", async () => {
-      const tokenAddresses = [
-        ...[...erc20Deployments].map((x) => x.address),
-        token6decimals.address,
-        token20decimals.address,
-      ];
+      const tokenAddresses = [...[...erc20Deployments].map((x) => x.address)];
 
       const txHash = deposit.hash;
       const tx = await ethers.provider.getTransaction(txHash);
@@ -69,8 +57,6 @@ describe("OmronDeposit", () => {
       const whitelist = await deposit.contract.getAllWhitelistedTokens();
       expect([...whitelist]).to.have.members([
         ...erc20Deployments.map((x) => x.address),
-        token6decimals.address,
-        token20decimals.address,
       ]);
     });
   });
@@ -80,8 +66,6 @@ describe("OmronDeposit", () => {
         await deposit.contract.getAllWhitelistedTokens();
       expect([...whitelistedTokens]).to.have.members([
         ...erc20Deployments.map((x) => x.address),
-        token6decimals.address,
-        token20decimals.address,
       ]);
     });
     it("Should get updated whitelisted tokens after adding a new token", async () => {
@@ -92,8 +76,6 @@ describe("OmronDeposit", () => {
       expect([...whitelistedTokens]).to.have.members([
         ...erc20Deployments.map((x) => x.address),
         nonWhitelistedToken.address,
-        token6decimals.address,
-        token20decimals.address,
       ]);
     });
   });
@@ -471,27 +453,6 @@ describe("OmronDeposit", () => {
         owner.address
       );
       expect(calculatedPoints2).to.equal(parseEther("2"));
-    });
-    it("Should correctly handle fractional points with ERC20", async () => {
-      let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      await addAllowance(token1, owner, deposit, parseEther("0.5"));
-      await depositTokens(deposit, token1, parseEther("0.5"), owner);
-
-      await time.increase(3600);
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      const calculatedPoints = await deposit.contract.calculatePoints(
-        owner.address
-      );
-      expect(calculatedPoints).to.equal(parseEther("0.5"));
-      await time.increase(3600);
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      const calculatedPoints2 = await deposit.contract.calculatePoints(
-        owner.address
-      );
-      expect(calculatedPoints2).to.equal(parseEther("1"));
     });
   });
   describe("pointBalance", () => {

@@ -23,8 +23,14 @@ module.exports = {
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {},
-    sepolia: sepoliaConfig,
-    mainnet: mainnetConfig,
+    sepolia: {
+      url: "https://sepolia.infura.io/v3/c7fda47531884d49aa5878876dbbabf3",
+      //accounts: [process.env.SEPOLIA_PRIVATE_KEY],
+    },
+    mainnet: {
+      url: "https://mainnet.infura.io/v3/c7fda47531884d49aa5878876dbbabf3",
+      //accounts: [process.env.MAINNET_PRIVATE_KEY],
+    },
   },
   namedAccounts: {
     deployer: 0,

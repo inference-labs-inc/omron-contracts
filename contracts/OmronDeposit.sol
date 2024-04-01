@@ -425,7 +425,20 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         claimAmount = _user.pointBalance;
         _user.pointBalance = 0;
 
-        emit PointsClaimed(_claimAddress, claimAmount, _user.pointBalance);
+        uint256 balance = user.tokenBalances[_tokenAddress];
+        if (balance < _amount) {
+            revert InsufficientBalance();
+        }
+
+        IERC20 token = IERC20(_tokenAddress);
+
+        _updatePoints(user);
+        user.tokenBalances[_tokenAddress] -= _amount;
+        user.pointsPerHour -= _amount;
+
+        token.safeTransfer(msg.sender, _amount);
+
+        emit Withdrawal(msg.sender, _tokenAddress, _amount);
     }
 
     // Internal functions

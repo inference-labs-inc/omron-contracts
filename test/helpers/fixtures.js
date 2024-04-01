@@ -14,14 +14,6 @@ const deployDepositContractFixture = async (numberOfERC20 = 5) => {
     ethers.parseEther("1000000"),
     18,
   ]);
-  const token6decimals = await deployContract("tstETH", [
-    ethers.parseEther("1000000"),
-    6,
-  ]);
-  const token20decimals = await deployContract("tstETH", [
-    ethers.parseEther("1000000"),
-    20,
-  ]);
 
   const brokenERC20 = await deployContract("BrokenERC20", [
     ethers.parseEther("1000000"),
@@ -29,17 +21,13 @@ const deployDepositContractFixture = async (numberOfERC20 = 5) => {
 
   const contract = await deployContract("OmronDeposit", [
     owner.address,
-    erc20Deployments
-      .map((deployment) => deployment.address)
-      .concat([token6decimals.address, token20decimals.address]),
+    erc20Deployments.map((deployment) => deployment.address),
   ]);
 
   return {
     deposit: contract,
     erc20Deployments,
     nonWhitelistedToken,
-    token6decimals,
-    token20decimals,
     brokenERC20,
   };
 };
