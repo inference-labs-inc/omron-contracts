@@ -118,21 +118,6 @@ describe("OmronDeposit", () => {
         .withArgs(owner.address);
     });
   });
-  describe("setWithdrawalsEnabled", () => {
-    it("Should reject setWithdrawalsEnabled when not owner", async () => {
-      await expect(
-        deposit.contract.connect(user1).setWithdrawalsEnabled(true)
-      ).to.be.revertedWithCustomError(
-        deposit.contract,
-        "OwnableUnauthorizedAccount"
-      );
-    });
-    it("Should accept setWithdrawalsEnabled when owner", async () => {
-      await expect(deposit.contract.connect(owner).setWithdrawalsEnabled(true))
-        .to.emit(deposit.contract, "WithdrawalsEnabled")
-        .withArgs(true);
-    });
-  });
 
   describe("deposit", () => {
     it("Should reject deposit of zero tokens", async () => {
@@ -215,21 +200,21 @@ describe("OmronDeposit", () => {
       expect(balance).to.equal(parseEther("1"));
     });
   });
-  describe("setClaimsEnabled", () => {
+  describe("setExitEnabled", () => {
     it("Should reject when not owner", async () => {
       await expect(
-        deposit.contract.connect(user1).setClaimsEnabled(true)
+        deposit.contract.connect(user1).setExitEnabled(true)
       ).to.be.revertedWithCustomError(
         deposit.contract,
         "OwnableUnauthorizedAccount"
       );
     });
     it("Should set claims enabled when owner", async () => {
-      await expect(deposit.contract.connect(owner).setClaimsEnabled(true))
-        .to.emit(deposit.contract, "ClaimsEnabled")
+      await expect(deposit.contract.connect(owner).setExitEnabled(true))
+        .to.emit(deposit.contract, "ExitEnabled")
         .withArgs(true);
-      const claimsEnabled = await deposit.contract.claimsEnabled();
-      expect(claimsEnabled).to.equal(true);
+      const exitEnabled = await deposit.contract.exitEnabled();
+      expect(exitEnabled).to.equal(true);
     });
   });
   describe("setClaimWallet", () => {
@@ -254,44 +239,53 @@ describe("OmronDeposit", () => {
       );
     });
   });
-  describe("claim", () => {
-    it("Should accept claim and reduce user's point balance to zero", async () => {
-      await deposit.contract.setClaimsEnabled(true);
+  describe("exit", () => {
+    it("Should accept exit and reduce user's point balance to zero", async () => {
+      await deposit.contract.setExitEnabled(true);
       await deposit.contract.setClaimWallet(user1.address);
-      await token1.contract.transfer(user2.address, parseEther("1"));
-      await addAllowance(token1, user2, deposit, parseEther("1"));
+      const currentTime = await time.latest();
+      await deposit.contract.setExitStartTime(currentTime + 3605);
+      await token1.contract.transfer(user2.address, parseEther("2"));
+      await addAllowance(token1, user2, deposit, parseEther("2"));
       await depositTokens(deposit, token1, parseEther("1"), user2);
-      await time.increase(3600);
+      await time.increase(3599);
+      await depositTokens(deposit, token1, parseEther("1"), user2);
       const initialInfo = await deposit.contract.getUserInfo(user2.address);
       expect(initialInfo.pointBalance).to.equal(parseEther("1"));
-      await deposit.contract.connect(user1).claim(user2.address);
+      await deposit.contract.connect(user1).exit(user2.address);
       const info = await deposit.contract.getUserInfo(user2.address);
       expect(info.pointBalance).to.equal(parseEther("0"));
     });
-    it("Should reject when claims disabled", async () => {
+    it("Should reject when exit disabled", async () => {
       await deposit.contract.setClaimWallet(user1.address);
       await expect(
-        deposit.contract.claim(user2.address)
-      ).to.be.revertedWithCustomError(deposit.contract, "ClaimsDisabled");
+        deposit.contract.connect(user1).exit(user2.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "ExitDisabled");
     });
     it("Should reject when claim address is null", async () => {
-      await deposit.contract.setClaimsEnabled(true);
+      await deposit.contract.setExitEnabled(true);
+      const currentTime = await time.latest();
+      await deposit.contract.setExitStartTime(currentTime + 1);
       await expect(
-        deposit.contract.claim(user1.address)
+        deposit.contract.exit(user1.address)
       ).to.be.revertedWithCustomError(deposit.contract, "ClaimWalletNotSet");
     });
-    it("Should reject claim for null address", async () => {
-      await deposit.contract.setClaimsEnabled(true);
+    it("Should reject exit for null address", async () => {
+      await deposit.contract.setExitEnabled(true);
       await deposit.contract.setClaimWallet(user1.address);
+      const currentTime = await time.latest();
+      await deposit.contract.setExitStartTime(currentTime + 1);
       await expect(
-        deposit.contract.connect(user1).claim(ZeroAddress)
+        deposit.contract.connect(user1).exit(ZeroAddress)
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
     it("Should reject when not claim address", async () => {
-      await deposit.contract.setClaimsEnabled(true);
+      await deposit.contract.setExitEnabled(true);
       await deposit.contract.setClaimWallet(user2.address);
+      const currentTime = await time.latest();
+      await deposit.contract.setExitStartTime(currentTime + 1);
       await expect(
-        deposit.contract.claim(user1.address)
+        deposit.contract.connect(user1).exit(user2.address)
       ).to.be.revertedWithCustomError(deposit.contract, "NotClaimWallet");
     });
   });
@@ -333,19 +327,6 @@ describe("OmronDeposit", () => {
       await deposit.contract.deposit(token2.address, parseEther("1"));
       info = await deposit.contract.getUserInfo(owner);
       expect(info.pointsPerHour).to.equal(parseEther("2"));
-    });
-
-    it("Should handle points per hour with deposits and withdrawals", async () => {
-      await deposit.contract.setWithdrawalsEnabled(true);
-      let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerHour).to.equal(parseEther("0"));
-      await addAllowance(token1, owner, deposit, parseEther("1"));
-      await deposit.contract.deposit(token1.address, parseEther("1"));
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerHour).to.equal(parseEther("1"));
-      await deposit.contract.withdraw(token1.address, parseEther("1"));
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointsPerHour).to.equal(parseEther("0"));
     });
   });
   describe("calculatePoints and pointBalance", () => {
@@ -402,36 +383,6 @@ describe("OmronDeposit", () => {
       await deposit.contract.deposit(token1.address, parseEther("2"));
       userInfo = await deposit.contract.getUserInfo(owner.address);
       expect(userInfo.pointBalance).to.equal(parseEther("2"));
-    });
-    it("Should handle mixed deposits and withdrawals", async () => {
-      let userInfo = await deposit.contract.getUserInfo(owner.address);
-      await deposit.contract.setWithdrawalsEnabled(true);
-      expect(userInfo.pointBalance).to.equal(parseEther("0"));
-      await addAllowance(token1, owner, deposit, parseEther("10"));
-      await deposit.contract.deposit(token1.address, parseEther("1")); // Balance should be 0, Points per hour should be 1
-      userInfo = await deposit.contract.getUserInfo(owner.address);
-      expect(userInfo.pointBalance).to.equal(parseEther("0"));
-      expect(userInfo.pointsPerHour).to.equal(parseEther("1"));
-      await time.increase(3599);
-      await deposit.contract.withdraw(token1.address, parseEther("1")); // Balance should be 1x1 = 1, Points per hour should be 1
-
-      userInfo = await deposit.contract.getUserInfo(owner.address);
-      expect(userInfo.pointBalance).to.equal(parseEther("1"));
-      expect(userInfo.pointsPerHour).to.equal(parseEther("0"));
-      await time.increase(3600);
-
-      await deposit.contract.deposit(token1.address, parseEther("0.000000005")); // Balance should be 0.000000005x1 = 0.000000005 + 1 = 1.000000005, Points per hour should be 0.000000005
-      userInfo = await deposit.contract.getUserInfo(owner.address);
-      expect(userInfo.pointBalance).to.equal(parseEther("1"));
-      expect(userInfo.pointsPerHour).to.equal(parseEther("0.000000005"));
-      await time.increase(3599);
-      await deposit.contract.withdraw(
-        token1.address,
-        parseEther("0.000000005")
-      ); // Balance should be 0, Points per hour should be 0
-      userInfo = await deposit.contract.getUserInfo(owner.address);
-      expect(userInfo.pointBalance).to.equal(parseEther("1.000000005"));
-      expect(userInfo.pointsPerHour).to.equal(parseEther("0"));
     });
   });
 });

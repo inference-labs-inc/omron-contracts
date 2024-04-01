@@ -259,20 +259,21 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev A modifier that checks if claims are enabled
+     * @dev A modifier that checks whether the current time is after the exit start time.
      */
     modifier onlyAfterExitStartTime() {
-        if (exitStartTime < block.timestamp) {
+        if (block.timestamp < exitStartTime) {
             revert ExitStartTimeNotPassed();
         }
         _;
     }
 
     /**
-     * @dev A modifier that checks if claims are enabled
+     * @dev A modifier that checkes whether the current time is before the exit start time.
+     * Will proceed to execution if exit start time isn't set, or if it is set to a date after the current time.
      */
     modifier onlyBeforeExitStartTime() {
-        if (exitStartTime > block.timestamp) {
+        if (exitStartTime != 0 && block.timestamp > exitStartTime) {
             revert ExitStartTimePassed();
         }
         _;
@@ -392,9 +393,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         onlyClaimWallet
         whenExitEnabled
     {
+        if (_userAddress == address(0)) {
+            revert ZeroAddress();
+        }
         UserInfo storage user = userInfo[_userAddress];
         _claimPoints(user, _userAddress);
-        user.pointsPerHour = 0;
         for (uint256 i; i < whitelistedTokensCount; ) {
             IERC20 token = IERC20(allWhitelistedTokens[i]);
             if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
@@ -402,6 +405,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
                 token.safeTransfer(_userAddress, balance);
                 emit Withdrawal(_userAddress, allWhitelistedTokens[i], balance);
                 user.tokenBalances[allWhitelistedTokens[i]] = 0;
+            }
+            unchecked {
+                ++i;
             }
         }
     }
@@ -424,6 +430,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         // Return their current point balance, and set it to zero.
         claimAmount = _user.pointBalance;
         _user.pointBalance = 0;
+        _user.pointsPerHour = 0;
 
         uint256 balance = user.tokenBalances[_tokenAddress];
         if (balance < _amount) {
@@ -450,9 +457,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
-            // If the exit start time is before the current time, then use it to determine time elapsed,
+            // If the current time is after the exitStartTime and it is non-zero, then use it to determine time elapsed,
             // since no points are being accrued after exit start
-            if (exitStartTime < block.timestamp && exitStartTime != 0) {
+            if (block.timestamp > exitStartTime && exitStartTime != 0) {
                 timeElapsed = exitStartTime - _user.lastUpdated;
             }
             uint256 pointsEarned = (timeElapsed *
