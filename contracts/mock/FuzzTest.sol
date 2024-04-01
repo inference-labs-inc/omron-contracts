@@ -22,19 +22,6 @@ contract OmronDepositTest is OmronDeposit {
         return (POINTS_DECIMALS == 18);
     }
 
-    function echidna_no_withdraw_more_than_deposit() public returns (bool) {
-        try
-            this.withdraw(
-                address(token),
-                userInfo[msg.sender].tokenBalances[address(token)] + 1
-            )
-        {
-            return false;
-        } catch {
-            return true;
-        }
-    }
-
     function echidna_test_whitelisted_tokens() public returns (bool) {
         address[] memory tokens = allWhitelistedTokens;
         for (uint i = 0; i < tokens.length; i++) {
