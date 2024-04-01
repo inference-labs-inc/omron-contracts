@@ -378,22 +378,28 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         emit Deposit(msg.sender, _tokenAddress, _amount);
     }
 
-    function exit()
+    /**
+     * @dev Called by the claim contract to exit a user's position and claim all points for the user
+     * @param _userAddress The address of the user to exit
+     */
+    function exit(
+        address _userAddress
+    )
         external
         nonReentrant
         onlyAfterExitStartTime
         onlyClaimWallet
         whenExitEnabled
     {
-        UserInfo storage user = userInfo[msg.sender];
-        _claimPoints(user, msg.sender);
+        UserInfo storage user = userInfo[_userAddress];
+        _claimPoints(user, _userAddress);
         user.pointsPerHour = 0;
         for (uint256 i; i < allWhitelistedTokens.length; ) {
             IERC20 token = IERC20(allWhitelistedTokens[i]);
             if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
                 uint256 balance = user.tokenBalances[allWhitelistedTokens[i]];
-                token.safeTransfer(msg.sender, balance);
-                emit Withdrawal(msg.sender, allWhitelistedTokens[i], balance);
+                token.safeTransfer(_userAddress, balance);
+                emit Withdrawal(_userAddress, allWhitelistedTokens[i], balance);
                 user.tokenBalances[allWhitelistedTokens[i]] = 0;
             }
         }
