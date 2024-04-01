@@ -5,9 +5,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-using SafeERC20 for IERC20Metadata;
+using SafeERC20 for IERC20;
 
 /**
  * @title OmronDeposit
@@ -58,12 +58,26 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     address[] public allWhitelistedTokens;
 
+    /**
+     * @notice The address of the contract which is allowed to claim points on behalf of users.
+     */
+    address public claimWallet;
+
+    /**
+     * @notice A boolean that indicates if claims are enabled
+     */
+    bool public claimsEnabled;
+
     // Custom Errors
     error ZeroAddress();
     error TokenNotWhitelisted();
     error InsufficientBalance();
     error WithdrawalsDisabled();
     error ZeroAmount();
+    error NotClaimWallet();
+    error NoClaimablePoints();
+    error ClaimWalletNotSet();
+    error ClaimsDisabled();
 
     // Events
 
@@ -102,6 +116,30 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @param _tokenAddress The address of the token that was added to the whitelist
      */
     event WhitelistedTokenAdded(address indexed _tokenAddress);
+
+    /**
+     * Emitted when points are claimed by a user
+     * @param user The address of the user that claimed the points
+     * @param amountClaimed The amount of points claimed by the user
+     * @param newPointBalance The new point balance of the user after the points are claimed
+     */
+    event PointsClaimed(
+        address indexed user,
+        uint256 amountClaimed,
+        uint256 newPointBalance
+    );
+
+    /**
+     * Emitted when the claims enabled state of the contract is changed
+     * @param _enabled The new state of claims enabled
+     */
+    event ClaimsEnabled(bool indexed _enabled);
+
+    /**
+     * Emitted when the claim wallet is set
+     * @param _claimWallet The address of the new claim wallet
+     */
+    event ClaimWalletSet(address indexed _claimWallet);
 
     /**
      * @dev The constructor for the OmronDeposit contract.
@@ -151,6 +189,27 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
+     * @dev Set the claims enabled state of the contract
+     * @param _enabled The new state of claims enabled
+     */
+    function setClaimsEnabled(bool _enabled) external onlyOwner {
+        claimsEnabled = _enabled;
+        emit ClaimsEnabled(_enabled);
+    }
+
+    /**
+     * @dev Set the address of the contract which is allowed to claim points on behalf of users. Can be set to the null address to disable claims.
+     * @param _claimWallet The address of the contract which is allowed to claim points on behalf of users.
+     */
+    function setClaimWallet(address _claimWallet) external onlyOwner {
+        if (_claimWallet == address(0)) {
+            revert ZeroAddress();
+        }
+        claimWallet = _claimWallet;
+        emit ClaimWalletSet(_claimWallet);
+    }
+
+    /**
      * @dev Pause the contract
      */
     function pause() external onlyOwner {
@@ -172,6 +231,29 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     modifier whenWithdrawalsEnabled() {
         if (!withdrawalsEnabled) {
             revert WithdrawalsDisabled();
+        }
+        _;
+    }
+
+    /**
+     * @dev A modifier that checks if the claim wallet is set and the sender is the claim wallet
+     */
+    modifier onlyClaimWallet() {
+        if (claimWallet == address(0)) {
+            revert ClaimWalletNotSet();
+        }
+        if (msg.sender != claimWallet) {
+            revert NotClaimWallet();
+        }
+        _;
+    }
+
+    /**
+     * @dev A modifier that checks if claims are enabled
+     */
+    modifier whenClaimsEnabled() {
+        if (!claimsEnabled) {
+            revert ClaimsDisabled();
         }
         _;
     }
@@ -263,13 +345,13 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert TokenNotWhitelisted();
         }
 
-        IERC20Metadata token = IERC20Metadata(_tokenAddress);
+        IERC20 token = IERC20(_tokenAddress);
 
         UserInfo storage user = userInfo[msg.sender];
 
         _updatePoints(user);
 
-        user.pointsPerHour += _adjustAmountToPoints(_amount, token.decimals());
+        user.pointsPerHour += _amount;
         user.tokenBalances[_tokenAddress] += _amount;
 
         token.safeTransferFrom(msg.sender, address(this), _amount);
@@ -301,15 +383,72 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert InsufficientBalance();
         }
 
-        IERC20Metadata token = IERC20Metadata(_tokenAddress);
+        IERC20 token = IERC20(_tokenAddress);
 
         _updatePoints(user);
         user.tokenBalances[_tokenAddress] -= _amount;
-        user.pointsPerHour -= _adjustAmountToPoints(_amount, token.decimals());
+        user.pointsPerHour -= _amount;
 
         token.safeTransfer(msg.sender, _amount);
 
         emit Withdrawal(msg.sender, _tokenAddress, _amount);
+    }
+
+    /**
+     * @dev Claim points from the contract
+     * @param _user The address of the user to claim points for
+     * @return claimAmount The amount of points claimed by the user
+     */
+    function claim(
+        address _user
+    )
+        public
+        nonReentrant
+        whenClaimsEnabled
+        onlyClaimWallet
+        returns (uint256 claimAmount)
+    {
+        if (_user == address(0)) {
+            revert ZeroAddress();
+        }
+
+        UserInfo storage user = userInfo[_user];
+
+        // Check if the user has any points to claim. If not then revert.
+        if (user.pointBalance == 0) {
+            revert NoClaimablePoints();
+        }
+
+        _updatePoints(user);
+
+        // Return their current point balance, and set it to zero.
+        claimAmount = user.pointBalance;
+        user.pointBalance = 0;
+
+        emit PointsClaimed(_user, claimAmount, user.pointBalance);
+    }
+
+    function exit() external nonReentrant whenWithdrawalsEnabled {
+        UserInfo storage user = userInfo[msg.sender];
+        _updatePoints(user);
+
+        for (uint256 i; i < allWhitelistedTokens.length; ) {
+            IERC20 token = IERC20(allWhitelistedTokens[i]);
+            if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
+                token.safeTransfer(
+                    msg.sender,
+                    user.tokenBalances[allWhitelistedTokens[i]]
+                );
+                user.tokenBalances[allWhitelistedTokens[i]] = 0;
+            }
+        }
+
+        user.pointsPerHour = 0;
+    }
+
+    function claimAndExit() external {
+        claim(msg.sender);
+        exit();
     }
 
     // Internal functions
@@ -323,33 +462,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
             uint256 pointsEarned = (timeElapsed *
                 _user.pointsPerHour *
-                10 ** 18) / (3600 * 10 ** 18);
+                10 ** POINTS_DECIMALS) / (3600 * 10 ** POINTS_DECIMALS);
             _user.pointBalance += pointsEarned;
         }
         _user.lastUpdated = block.timestamp;
-    }
-
-    /**
-     * Adjust the amount to a points value, based on the token's decimals and the points decimals
-     * @param _amount The amount to adjust
-     * @param tokenDecimals The number of decimals of the token
-     * @return adjustedAmount The amount adjusted to a points value
-     */
-    function _adjustAmountToPoints(
-        uint256 _amount,
-        uint8 tokenDecimals
-    ) private pure returns (uint256 adjustedAmount) {
-        if (tokenDecimals == POINTS_DECIMALS) {
-            adjustedAmount = _amount;
-        } else if (tokenDecimals < POINTS_DECIMALS) {
-            adjustedAmount =
-                _amount *
-                (10 ** (POINTS_DECIMALS - tokenDecimals));
-        } else {
-            // Precision loss is acceptable
-            adjustedAmount =
-                _amount /
-                (10 ** (tokenDecimals - POINTS_DECIMALS));
-        }
     }
 }

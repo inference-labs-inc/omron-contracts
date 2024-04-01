@@ -1,6 +1,6 @@
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { ZeroAddress, parseEther, parseUnits } from "ethers";
+import { ZeroAddress, parseEther } from "ethers";
 import { deployContract } from "../helpers/deployment.js";
 import { deployDepositContractFixture } from "./helpers/fixtures.js";
 import {
@@ -318,6 +318,86 @@ describe("OmronDeposit", () => {
       expect(balance).to.equal(parseEther("1"));
     });
   });
+  describe("setClaimsEnabled", () => {
+    it("Should reject when not owner", async () => {
+      await expect(
+        deposit.contract.connect(user1).setClaimsEnabled(true)
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+    it("Should set claims enabled when owner", async () => {
+      await expect(deposit.contract.connect(owner).setClaimsEnabled(true))
+        .to.emit(deposit.contract, "ClaimsEnabled")
+        .withArgs(true);
+      const claimsEnabled = await deposit.contract.claimsEnabled();
+      expect(claimsEnabled).to.equal(true);
+    });
+  });
+  describe("setClaimWallet", () => {
+    it("Should set claim wallet when owner", async () => {
+      await expect(
+        deposit.contract.connect(owner).setClaimWallet(user2.address)
+      )
+        .to.emit(deposit.contract, "ClaimWalletSet")
+        .withArgs(user2.address);
+    });
+    it("Should not set claim wallet provided zero address", async () => {
+      await expect(
+        deposit.contract.connect(owner).setClaimWallet(ZeroAddress)
+      ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
+    });
+    it("Should not set claim wallet when not owner", async () => {
+      await expect(
+        deposit.contract.connect(user1).setClaimWallet(user2.address)
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+  });
+  describe("claim", () => {
+    it("Should accept claim and reduce user's point balance to zero", async () => {
+      await deposit.contract.setClaimsEnabled(true);
+      await deposit.contract.setClaimWallet(user1.address);
+      await token1.contract.transfer(user2.address, parseEther("1"));
+      await addAllowance(token1, user2, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user2);
+      await time.increase(3600);
+      const initialInfo = await deposit.contract.getUserInfo(user2.address);
+      expect(initialInfo.pointBalance).to.equal(parseEther("1"));
+      await deposit.contract.connect(user1).claim(user2.address);
+      const info = await deposit.contract.getUserInfo(user2.address);
+      expect(info.pointBalance).to.equal(parseEther("0"));
+    });
+    it("Should reject when claims disabled", async () => {
+      await deposit.contract.setClaimWallet(user1.address);
+      await expect(
+        deposit.contract.claim(user2.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "ClaimsDisabled");
+    });
+    it("Should reject when claim address is null", async () => {
+      await deposit.contract.setClaimsEnabled(true);
+      await expect(
+        deposit.contract.claim(user1.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "ClaimWalletNotSet");
+    });
+    it("Should reject claim for null address", async () => {
+      await deposit.contract.setClaimsEnabled(true);
+      await deposit.contract.setClaimWallet(user1.address);
+      await expect(
+        deposit.contract.connect(user1).claim(ZeroAddress)
+      ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
+    });
+    it("Should reject when not claim address", async () => {
+      await deposit.contract.setClaimsEnabled(true);
+      await deposit.contract.setClaimWallet(user2.address);
+      await expect(
+        deposit.contract.claim(user1.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "NotClaimWallet");
+    });
+  });
   describe("addWhitelistedToken", () => {
     it("Should reject token at zero address", async () => {
       await expect(
@@ -395,63 +475,9 @@ describe("OmronDeposit", () => {
     it("Should correctly handle fractional points with ERC20", async () => {
       let info = await deposit.contract.getUserInfo(owner);
       expect(info.pointBalance).to.equal(parseEther("0"));
-      await addAllowance(token6decimals, owner, deposit, parseEther("0.5"));
-      await deposit.contract.deposit(
-        token6decimals.address,
-        parseUnits("0.5", 6)
-      );
-      await time.increase(3600);
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      const calculatedPoints = await deposit.contract.calculatePoints(
-        owner.address
-      );
-      expect(calculatedPoints).to.equal(parseEther("0.5"));
-      await time.increase(3600);
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      const calculatedPoints2 = await deposit.contract.calculatePoints(
-        owner.address
-      );
-      expect(calculatedPoints2).to.equal(parseEther("1"));
-    });
-    it("Should correctly handle fractional points with 20 decimal ERC20", async () => {
-      let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      await addAllowance(
-        token20decimals,
-        owner,
-        deposit,
-        parseUnits("0.5", 20)
-      );
-      await deposit.contract.deposit(
-        token20decimals.address,
-        parseUnits("0.5", 20)
-      );
-      await time.increase(3600);
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      const calculatedPoints = await deposit.contract.calculatePoints(
-        owner.address
-      );
-      expect(calculatedPoints).to.equal(parseEther("0.5"));
+      await addAllowance(token1, owner, deposit, parseEther("0.5"));
+      await depositTokens(deposit, token1, parseEther("0.5"), owner);
 
-      info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      await time.increase(3600);
-      const calculatedPoints2 = await deposit.contract.calculatePoints(
-        owner.address
-      );
-      expect(calculatedPoints2).to.equal(parseEther("1"));
-    });
-    it("Should correctly handle fractional points with 6 decimal ERC20", async () => {
-      let info = await deposit.contract.getUserInfo(owner);
-      expect(info.pointBalance).to.equal(parseEther("0"));
-      await addAllowance(token6decimals, owner, deposit, parseUnits("0.5", 6));
-      await deposit.contract.deposit(
-        token6decimals.address,
-        parseUnits("0.5", 6)
-      );
       await time.increase(3600);
       info = await deposit.contract.getUserInfo(owner);
       expect(info.pointBalance).to.equal(parseEther("0"));
@@ -459,10 +485,9 @@ describe("OmronDeposit", () => {
         owner.address
       );
       expect(calculatedPoints).to.equal(parseEther("0.5"));
-
+      await time.increase(3600);
       info = await deposit.contract.getUserInfo(owner);
       expect(info.pointBalance).to.equal(parseEther("0"));
-      await time.increase(3600);
       const calculatedPoints2 = await deposit.contract.calculatePoints(
         owner.address
       );
