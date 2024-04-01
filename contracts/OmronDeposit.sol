@@ -44,9 +44,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Variables
 
     /**
-     * @notice A boolean that indicates if withdrawals are enabled
+     * @notice A boolean that indicates if exiting is enabled
      */
-    bool public withdrawalsEnabled;
+    bool public exitEnabled;
 
     /**
      * @notice The number of decimal places for points
@@ -64,20 +64,24 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     address public claimWallet;
 
     /**
-     * @notice A boolean that indicates if claims are enabled
+     * @notice The time at which exits become enabled and points no longer accrue for any deposits.
      */
-    bool public claimsEnabled;
+    uint256 public exitStartTime;
 
     // Custom Errors
     error ZeroAddress();
     error TokenNotWhitelisted();
     error InsufficientBalance();
-    error WithdrawalsDisabled();
+    error ExitDisabled();
     error ZeroAmount();
     error NotClaimWallet();
     error NoClaimablePoints();
     error ClaimWalletNotSet();
     error ClaimsDisabled();
+    error ExitStartCannotBeRetroactive();
+    error ExitStartTimeAlreadySet();
+    error ExitStartTimeNotPassed();
+    error ExitStartTimePassed();
 
     // Events
 
@@ -106,10 +110,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     );
 
     /**
-     * Emitted when the withdrawals enabled state of the contract is changed
-     * @param _enabled The new state of withdrawals enabled
+     * Emitted when the exit enabled state of the contract is changed
+     * @param _enabled The new state of exit enabled
      */
-    event WithdrawalsEnabled(bool indexed _enabled);
+    event ExitEnabled(bool indexed _enabled);
 
     /**
      * Emitted when a new token is added to the whitelist
@@ -180,21 +184,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev Set the withdrawals enabled state of the contract
-     * @param _enabled The new state of withdrawals enabled
+     * @dev Set the exit enabled state of the contract
+     * @param _enabled The new state of exit enabled
      */
-    function setWithdrawalsEnabled(bool _enabled) external onlyOwner {
-        withdrawalsEnabled = _enabled;
-        emit WithdrawalsEnabled(_enabled);
-    }
-
-    /**
-     * @dev Set the claims enabled state of the contract
-     * @param _enabled The new state of claims enabled
-     */
-    function setClaimsEnabled(bool _enabled) external onlyOwner {
-        claimsEnabled = _enabled;
-        emit ClaimsEnabled(_enabled);
+    function setExitEnabled(bool _enabled) external onlyOwner {
+        exitEnabled = _enabled;
+        emit ExitEnabled(_enabled);
     }
 
     /**
@@ -207,6 +202,20 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         }
         claimWallet = _claimWallet;
         emit ClaimWalletSet(_claimWallet);
+    }
+
+    /**
+     * @dev Set the timestamp of the end of the points accrual period. Points will no longer accrue for any deposits beyond this timestamp.
+     * @param _newExitStartTime The timestamp of the end of the points accrual period.
+     */
+    function setExitStartTime(uint256 _newExitStartTime) external onlyOwner {
+        if (exitStartTime != 0) {
+            revert ExitStartTimeAlreadySet();
+        }
+        if (_newExitStartTime < block.timestamp) {
+            revert ExitStartCannotBeRetroactive();
+        }
+        exitStartTime = _newExitStartTime;
     }
 
     /**
@@ -226,11 +235,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Modifiers
 
     /**
-     * A@dev modifier that checks if withdrawals are enabled
+     * A@dev modifier that checks if exit functionality is enabled
      */
-    modifier whenWithdrawalsEnabled() {
-        if (!withdrawalsEnabled) {
-            revert WithdrawalsDisabled();
+    modifier whenExitEnabled() {
+        if (!exitEnabled) {
+            revert ExitDisabled();
         }
         _;
     }
@@ -251,9 +260,19 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev A modifier that checks if claims are enabled
      */
-    modifier whenClaimsEnabled() {
-        if (!claimsEnabled) {
-            revert ClaimsDisabled();
+    modifier onlyAfterExitStartTime() {
+        if (exitStartTime < block.timestamp) {
+            revert ExitStartTimeNotPassed();
+        }
+        _;
+    }
+
+    /**
+     * @dev A modifier that checks if claims are enabled
+     */
+    modifier onlyBeforeExitStartTime() {
+        if (exitStartTime > block.timestamp) {
+            revert ExitStartTimePassed();
         }
         _;
     }
@@ -336,7 +355,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function deposit(
         address _tokenAddress,
         uint256 _amount
-    ) external nonReentrant whenNotPaused {
+    ) external nonReentrant whenNotPaused onlyBeforeExitStartTime {
         if (_amount == 0) {
             revert ZeroAmount();
         }
@@ -359,96 +378,47 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         emit Deposit(msg.sender, _tokenAddress, _amount);
     }
 
-    /**
-     * @dev Withdraw a token from the contract
-     * @param _tokenAddress The address of the token to be withdrawn
-     * @param _amount The amount of the token to be withdrawn
-     */
-    function withdraw(
-        address _tokenAddress,
-        uint256 _amount
-    ) external nonReentrant whenWithdrawalsEnabled {
-        if (_amount == 0) {
-            revert ZeroAmount();
-        }
-
-        if (!whitelistedTokens[_tokenAddress]) {
-            revert TokenNotWhitelisted();
-        }
-
+    function exit()
+        external
+        nonReentrant
+        onlyAfterExitStartTime
+        onlyClaimWallet
+        whenExitEnabled
+    {
         UserInfo storage user = userInfo[msg.sender];
-
-        uint256 balance = user.tokenBalances[_tokenAddress];
-        if (balance < _amount) {
-            revert InsufficientBalance();
+        _claimPoints(user, msg.sender);
+        user.pointsPerHour = 0;
+        for (uint256 i; i < allWhitelistedTokens.length; ) {
+            IERC20 token = IERC20(allWhitelistedTokens[i]);
+            if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
+                uint256 balance = user.tokenBalances[allWhitelistedTokens[i]];
+                token.safeTransfer(msg.sender, balance);
+                emit Withdrawal(msg.sender, allWhitelistedTokens[i], balance);
+                user.tokenBalances[allWhitelistedTokens[i]] = 0;
+            }
         }
-
-        IERC20 token = IERC20(_tokenAddress);
-
-        _updatePoints(user);
-        user.tokenBalances[_tokenAddress] -= _amount;
-        user.pointsPerHour -= _amount;
-
-        token.safeTransfer(msg.sender, _amount);
-
-        emit Withdrawal(msg.sender, _tokenAddress, _amount);
     }
 
     /**
      * @dev Claim points from the contract
-     * @param _user The address of the user to claim points for
-     * @return claimAmount The amount of points claimed by the user
+     * @param _user The user to claim points for
      */
-    function claim(
-        address _user
-    )
-        public
-        nonReentrant
-        whenClaimsEnabled
-        onlyClaimWallet
-        returns (uint256 claimAmount)
-    {
-        if (_user == address(0)) {
-            revert ZeroAddress();
-        }
-
-        UserInfo storage user = userInfo[_user];
-
+    function _claimPoints(
+        UserInfo storage _user,
+        address _claimAddress
+    ) private returns (uint256 claimAmount) {
         // Check if the user has any points to claim. If not then revert.
-        if (user.pointBalance == 0) {
+        if (_user.pointBalance == 0) {
             revert NoClaimablePoints();
         }
 
-        _updatePoints(user);
+        _updatePoints(_user);
 
         // Return their current point balance, and set it to zero.
-        claimAmount = user.pointBalance;
-        user.pointBalance = 0;
+        claimAmount = _user.pointBalance;
+        _user.pointBalance = 0;
 
-        emit PointsClaimed(_user, claimAmount, user.pointBalance);
-    }
-
-    function exit() external nonReentrant whenWithdrawalsEnabled {
-        UserInfo storage user = userInfo[msg.sender];
-        _updatePoints(user);
-
-        for (uint256 i; i < allWhitelistedTokens.length; ) {
-            IERC20 token = IERC20(allWhitelistedTokens[i]);
-            if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
-                token.safeTransfer(
-                    msg.sender,
-                    user.tokenBalances[allWhitelistedTokens[i]]
-                );
-                user.tokenBalances[allWhitelistedTokens[i]] = 0;
-            }
-        }
-
-        user.pointsPerHour = 0;
-    }
-
-    function claimAndExit() external {
-        claim(msg.sender);
-        exit();
+        emit PointsClaimed(_claimAddress, claimAmount, _user.pointBalance);
     }
 
     // Internal functions
@@ -460,6 +430,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
+            // If the exit start time is before the current time, then use it to determine time elapsed,
+            // since no points are being accrued after exit start
+            if (exitStartTime < block.timestamp) {
+                timeElapsed = exitStartTime - _user.lastUpdated;
+            }
             uint256 pointsEarned = (timeElapsed *
                 _user.pointsPerHour *
                 10 ** POINTS_DECIMALS) / (3600 * 10 ** POINTS_DECIMALS);
