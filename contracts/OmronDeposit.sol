@@ -59,6 +59,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     address[] public allWhitelistedTokens;
 
     /**
+     * @notice The number of whitelisted tokens
+     */
+    uint256 public whitelistedTokensCount;
+
+    /**
      * @notice The address of the contract which is allowed to claim points on behalf of users.
      */
     address public claimWallet;
@@ -71,13 +76,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Custom Errors
     error ZeroAddress();
     error TokenNotWhitelisted();
-    error InsufficientBalance();
     error ExitDisabled();
     error ZeroAmount();
     error NotClaimWallet();
     error NoClaimablePoints();
     error ClaimWalletNotSet();
-    error ClaimsDisabled();
     error ExitStartCannotBeRetroactive();
     error ExitStartTimeAlreadySet();
     error ExitStartTimeNotPassed();
@@ -134,12 +137,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     );
 
     /**
-     * Emitted when the claims enabled state of the contract is changed
-     * @param _enabled The new state of claims enabled
-     */
-    event ClaimsEnabled(bool indexed _enabled);
-
-    /**
      * Emitted when the claim wallet is set
      * @param _claimWallet The address of the new claim wallet
      */
@@ -154,14 +151,15 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _initialOwner,
         address[] memory _whitelistedTokens
     ) Ownable(_initialOwner) {
-        uint256 length = _whitelistedTokens.length;
-        for (uint256 i; i < length; ) {
+        whitelistedTokensCount = _whitelistedTokens.length;
+        for (uint256 i; i < whitelistedTokensCount; ) {
             address token = _whitelistedTokens[i];
             if (token == address(0)) {
                 revert ZeroAddress();
             }
             whitelistedTokens[token] = true;
             allWhitelistedTokens.push(token);
+
             emit WhitelistedTokenAdded(token);
             unchecked {
                 ++i;
@@ -180,6 +178,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         }
         whitelistedTokens[_tokenAddress] = true;
         allWhitelistedTokens.push(_tokenAddress);
+        unchecked {
+            ++whitelistedTokensCount;
+        }
         emit WhitelistedTokenAdded(_tokenAddress);
     }
 
@@ -235,7 +236,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Modifiers
 
     /**
-     * A@dev modifier that checks if exit functionality is enabled
+     * @dev modifier that checks if exit functionality is enabled
      */
     modifier whenExitEnabled() {
         if (!exitEnabled) {
@@ -394,7 +395,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         UserInfo storage user = userInfo[_userAddress];
         _claimPoints(user, _userAddress);
         user.pointsPerHour = 0;
-        for (uint256 i; i < allWhitelistedTokens.length; ) {
+        for (uint256 i; i < whitelistedTokensCount; ) {
             IERC20 token = IERC20(allWhitelistedTokens[i]);
             if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
                 uint256 balance = user.tokenBalances[allWhitelistedTokens[i]];
