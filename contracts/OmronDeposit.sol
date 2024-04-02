@@ -60,11 +60,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     address[] public allWhitelistedTokens;
 
     /**
-     * @notice The number of whitelisted tokens
-     */
-    uint256 public whitelistedTokensCount;
-
-    /**
      * @notice The address of the contract which is allowed to claim points on behalf of users.
      */
     address public claimManager;
@@ -151,8 +146,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         address _initialOwner,
         address[] memory _whitelistedTokens
     ) Ownable(_initialOwner) {
-        whitelistedTokensCount = _whitelistedTokens.length;
-        for (uint256 i; i < whitelistedTokensCount; ) {
+        for (uint256 i; i < _whitelistedTokens.length; ) {
             address token = _whitelistedTokens[i];
             if (token == address(0)) {
                 revert ZeroAddress();
@@ -179,9 +173,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         }
         whitelistedTokens[_tokenAddress] = true;
         allWhitelistedTokens.push(_tokenAddress);
-        unchecked {
-            ++whitelistedTokensCount;
-        }
         emit WhitelistedTokenAdded(_tokenAddress);
     }
 
@@ -404,7 +395,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         pointsClaimed = _claimPoints(user, _userAddress);
 
-        for (uint256 i; i < whitelistedTokensCount; ) {
+        for (uint256 i; i < allWhitelistedTokens.length; ) {
             IERC20 token = IERC20(allWhitelistedTokens[i]);
 
             if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
