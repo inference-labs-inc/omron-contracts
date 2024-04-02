@@ -2,7 +2,10 @@ import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ZeroAddress, parseEther } from "ethers";
 import { deployContract } from "../helpers/deployment.js";
-import { deployDepositContractFixture } from "./helpers/fixtures.js";
+import {
+  deployDepositContractFixture,
+  deployMockClaimContractFixture,
+} from "./helpers/fixtures.js";
 import { addAllowance, depositTokens } from "./helpers/interactions.js";
 
 describe("OmronDeposit", () => {
@@ -272,6 +275,24 @@ describe("OmronDeposit", () => {
     });
   });
   describe("exit", () => {
+    it("Should correctly exit using mock claim contract", async () => {
+      const mockClaimContract = await deployMockClaimContractFixture(
+        deposit.address
+      );
+      await deposit.contract.setClaimWallet(mockClaimContract.address);
+      await deposit.contract.setExitEnabled(true);
+      await token1.contract.transfer(user2.address, parseEther("1"));
+      await addAllowance(token1, user2, deposit, parseEther("2"));
+      await depositTokens(deposit, token1, parseEther("1"), user2);
+      await deposit.contract.setExitStartTime((await time.latest()) + 3600);
+      await time.increase(3600);
+      await expect(mockClaimContract.contract.exit(user2.address))
+        .to.emit(mockClaimContract.contract, "ClaimSuccess")
+        .withArgs(user2.address, parseEther("1"));
+      expect(await token1.contract.balanceOf(user2.address)).to.equal(
+        parseEther("1")
+      );
+    });
     it("Should accept exit and reduce user's point balance to zero", async () => {
       await deposit.contract.setExitEnabled(true);
       await deposit.contract.setClaimWallet(user1.address);

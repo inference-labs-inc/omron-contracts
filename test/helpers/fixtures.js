@@ -32,4 +32,9 @@ const deployDepositContractFixture = async (numberOfERC20 = 5) => {
   };
 };
 
-export { deployDepositContractFixture };
+const deployMockClaimContractFixture = async (depositContractAddress) => {
+  const contract = await deployContract("MockClaim", [depositContractAddress]);
+  return contract;
+};
+
+export { deployDepositContractFixture, deployMockClaimContractFixture };
