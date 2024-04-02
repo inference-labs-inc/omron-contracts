@@ -67,7 +67,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice The address of the contract which is allowed to claim points on behalf of users.
      */
-    address public claimWallet;
+    address public claimManager;
 
     /**
      * @notice The time at which exits become enabled and points no longer accrue for any deposits.
@@ -79,8 +79,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error TokenNotWhitelisted();
     error ExitDisabled();
     error ZeroAmount();
-    error NotClaimWallet();
-    error ClaimWalletNotSet();
+    error NotClaimManager();
+    error ClaimManagerNotSet();
     error ExitStartCannotBeRetroactive();
     error ExitStartTimeAlreadySet();
     error ExitStartTimeNotPassed();
@@ -138,9 +138,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * Emitted when the claim wallet is set
-     * @param _claimWallet The address of the new claim wallet
+     * @param _claimManager The address of the new claim wallet
      */
-    event ClaimWalletSet(address indexed _claimWallet);
+    event ClaimManagerSet(address indexed _claimManager);
 
     /**
      * @dev The constructor for the OmronDeposit contract.
@@ -196,14 +196,14 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @dev Set the address of the contract which is allowed to claim points on behalf of users. Can be set to the null address to disable claims.
-     * @param _claimWallet The address of the contract which is allowed to claim points on behalf of users.
+     * @param _claimManager The address of the contract which is allowed to claim points on behalf of users.
      */
-    function setClaimWallet(address _claimWallet) external onlyOwner {
-        if (_claimWallet == address(0)) {
+    function setClaimManager(address _claimManager) external onlyOwner {
+        if (_claimManager == address(0)) {
             revert ZeroAddress();
         }
-        claimWallet = _claimWallet;
-        emit ClaimWalletSet(_claimWallet);
+        claimManager = _claimManager;
+        emit ClaimManagerSet(_claimManager);
     }
 
     /**
@@ -249,12 +249,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev A modifier that checks if the claim wallet is set and the sender is the claim wallet
      */
-    modifier onlyClaimWallet() {
-        if (claimWallet == address(0)) {
-            revert ClaimWalletNotSet();
+    modifier onlyClaimManager() {
+        if (claimManager == address(0)) {
+            revert ClaimManagerNotSet();
         }
-        if (msg.sender != claimWallet) {
-            revert NotClaimWallet();
+        if (msg.sender != claimManager) {
+            revert NotClaimManager();
         }
         _;
     }
@@ -392,7 +392,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         external
         nonReentrant
         onlyAfterExitStartTime
-        onlyClaimWallet
+        onlyClaimManager
         whenExitEnabled
         returns (uint256 pointsClaimed)
     {

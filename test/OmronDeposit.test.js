@@ -136,7 +136,7 @@ describe("OmronDeposit", () => {
     });
     it("Should reject deposit when past exit start time", async () => {
       await deposit.contract.setExitEnabled(true);
-      await deposit.contract.setClaimWallet(user1.address);
+      await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
       await deposit.contract.setExitStartTime(currentTime + 3600);
       await time.increase(3600);
@@ -230,22 +230,22 @@ describe("OmronDeposit", () => {
       expect(exitEnabled).to.equal(true);
     });
   });
-  describe("setClaimWallet", () => {
+  describe("setClaimManager", () => {
     it("Should set claim wallet when owner", async () => {
       await expect(
-        deposit.contract.connect(owner).setClaimWallet(user2.address)
+        deposit.contract.connect(owner).setClaimManager(user2.address)
       )
-        .to.emit(deposit.contract, "ClaimWalletSet")
+        .to.emit(deposit.contract, "ClaimManagerSet")
         .withArgs(user2.address);
     });
     it("Should not set claim wallet provided zero address", async () => {
       await expect(
-        deposit.contract.connect(owner).setClaimWallet(ZeroAddress)
+        deposit.contract.connect(owner).setClaimManager(ZeroAddress)
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
     it("Should not set claim wallet when not owner", async () => {
       await expect(
-        deposit.contract.connect(user1).setClaimWallet(user2.address)
+        deposit.contract.connect(user1).setClaimManager(user2.address)
       ).to.be.revertedWithCustomError(
         deposit.contract,
         "OwnableUnauthorizedAccount"
@@ -279,7 +279,7 @@ describe("OmronDeposit", () => {
       const mockClaimContract = await deployMockClaimContractFixture(
         deposit.address
       );
-      await deposit.contract.setClaimWallet(mockClaimContract.address);
+      await deposit.contract.setClaimManager(mockClaimContract.address);
       await deposit.contract.setExitEnabled(true);
       await token1.contract.transfer(user2.address, parseEther("1"));
       await addAllowance(token1, user2, deposit, parseEther("2"));
@@ -295,7 +295,7 @@ describe("OmronDeposit", () => {
     });
     it("Should accept exit and reduce user's point balance to zero", async () => {
       await deposit.contract.setExitEnabled(true);
-      await deposit.contract.setClaimWallet(user1.address);
+      await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
       await deposit.contract.setExitStartTime(currentTime + 3605);
       await token1.contract.transfer(user2.address, parseEther("2"));
@@ -311,7 +311,7 @@ describe("OmronDeposit", () => {
     });
     it("Should correctly handle point accrual and exit process", async () => {
       await deposit.contract.setExitEnabled(true);
-      await deposit.contract.setClaimWallet(user1.address);
+      await deposit.contract.setClaimManager(user1.address);
 
       // Transfer and allow tokens for deposit
       await token1.contract.transfer(user2.address, parseEther("2"));
@@ -364,7 +364,7 @@ describe("OmronDeposit", () => {
       expect(postExitInfo.pointBalance).to.equal(parseEther("0"));
     });
     it("Should reject when exit disabled", async () => {
-      await deposit.contract.setClaimWallet(user1.address);
+      await deposit.contract.setClaimManager(user1.address);
       await expect(
         deposit.contract.connect(user1).exit(user2.address)
       ).to.be.revertedWithCustomError(deposit.contract, "ExitDisabled");
@@ -375,11 +375,11 @@ describe("OmronDeposit", () => {
       await deposit.contract.setExitStartTime(currentTime + 1);
       await expect(
         deposit.contract.exit(user1.address)
-      ).to.be.revertedWithCustomError(deposit.contract, "ClaimWalletNotSet");
+      ).to.be.revertedWithCustomError(deposit.contract, "ClaimManagerNotSet");
     });
     it("Should reject exit for null address", async () => {
       await deposit.contract.setExitEnabled(true);
-      await deposit.contract.setClaimWallet(user1.address);
+      await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
       await deposit.contract.setExitStartTime(currentTime + 1);
       await expect(
@@ -388,16 +388,16 @@ describe("OmronDeposit", () => {
     });
     it("Should reject when not claim address", async () => {
       await deposit.contract.setExitEnabled(true);
-      await deposit.contract.setClaimWallet(user2.address);
+      await deposit.contract.setClaimManager(user2.address);
       const currentTime = await time.latest();
       await deposit.contract.setExitStartTime(currentTime + 1);
       await expect(
         deposit.contract.connect(user1).exit(user2.address)
-      ).to.be.revertedWithCustomError(deposit.contract, "NotClaimWallet");
+      ).to.be.revertedWithCustomError(deposit.contract, "NotClaimManager");
     });
     it("Should reject when before exit time", async () => {
       await deposit.contract.setExitEnabled(true);
-      await deposit.contract.setClaimWallet(user2.address);
+      await deposit.contract.setClaimManager(user2.address);
       const currentTime = await time.latest();
       await deposit.contract.setExitStartTime(currentTime + 3600);
       await expect(
