@@ -131,6 +131,16 @@ describe("OmronDeposit", () => {
         "ZeroAmount"
       );
     });
+    it("Should reject deposit when past exit start time", async () => {
+      await deposit.contract.setExitEnabled(true);
+      await deposit.contract.setClaimWallet(user1.address);
+      const currentTime = await time.latest();
+      await deposit.contract.setExitStartTime(currentTime + 3600);
+      await time.increase(3600);
+      await expect(
+        deposit.contract.connect(owner).deposit(token1.address, parseEther("1"))
+      ).to.be.revertedWithCustomError(deposit.contract, "ExitStartTimePassed");
+    });
     it("Should reject deposit when paused", async () => {
       await expect(deposit.contract.connect(owner).pause())
         .to.emit(deposit.contract, "Paused")
@@ -239,6 +249,28 @@ describe("OmronDeposit", () => {
       );
     });
   });
+
+  describe("setExitStartTime", () => {
+    it("Should prevent setting a new exit start time once one is selected", async () => {
+      const currentTime = await time.latest();
+      await deposit.contract.setExitStartTime(currentTime + 3605);
+      await expect(
+        deposit.contract.connect(owner).setExitStartTime(currentTime + 3605)
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "ExitStartTimeAlreadySet"
+      );
+    });
+    it("Should prevent setting a new exit start time before the current time", async () => {
+      const currentTime = await time.latest();
+      await expect(
+        deposit.contract.connect(owner).setExitStartTime(currentTime - 1)
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "ExitStartCannotBeRetroactive"
+      );
+    });
+  });
   describe("exit", () => {
     it("Should accept exit and reduce user's point balance to zero", async () => {
       await deposit.contract.setExitEnabled(true);
@@ -255,6 +287,60 @@ describe("OmronDeposit", () => {
       await deposit.contract.connect(user1).exit(user2.address);
       const info = await deposit.contract.getUserInfo(user2.address);
       expect(info.pointBalance).to.equal(parseEther("0"));
+    });
+    it("Should correctly handle point accrual and exit process", async () => {
+      await deposit.contract.setExitEnabled(true);
+      await deposit.contract.setClaimWallet(user1.address);
+
+      // Transfer and allow tokens for deposit
+      await token1.contract.transfer(user2.address, parseEther("2"));
+      await addAllowance(token1, user2, deposit, parseEther("2"));
+
+      // Initial deposit
+
+      await depositTokens(deposit, token1, parseEther("1"), user2);
+      const currentTime = await time.latest();
+      // In two hours, the contract will switch to exit mode
+      const exitStartTime = currentTime + 7201;
+
+      // Set exit start time to 2 hours in the future
+      await deposit.contract.setExitStartTime(exitStartTime);
+
+      // Simulate nearly 2 hours passing
+      await time.increase(exitStartTime - currentTime - 3);
+      const nowTime = await time.latest();
+      console.log(currentTime, nowTime, exitStartTime);
+
+      // Make a last-second deposit
+      await depositTokens(deposit, token1, parseEther("1"), user2);
+      const additionalPointsFromLastDeposit = parseEther(
+        "0.000555555555555555"
+      );
+
+      // Simulate another hour passing, post-exit start time
+      await time.increase(3600);
+
+      // Verify initial point balance before exit
+      const initialInfo = await deposit.contract.getUserInfo(user2.address);
+      expect(initialInfo.pointBalance).to.equal(parseEther("2"));
+
+      // Perform exit and verify event emission
+      await expect(deposit.contract.connect(user1).exit(user2.address))
+        .to.emit(deposit.contract, "PointsClaimed")
+        .withArgs(
+          user2.address,
+          parseEther("2") + additionalPointsFromLastDeposit,
+          parseEther("0")
+        );
+
+      // Verify token balance remains unchanged after exit
+      expect(await token1.contract.balanceOf(user2.address)).to.equal(
+        parseEther("2")
+      );
+
+      // Confirm point balance is reset to zero after exit
+      const postExitInfo = await deposit.contract.getUserInfo(user2.address);
+      expect(postExitInfo.pointBalance).to.equal(parseEther("0"));
     });
     it("Should reject when exit disabled", async () => {
       await deposit.contract.setClaimWallet(user1.address);
@@ -287,6 +373,18 @@ describe("OmronDeposit", () => {
       await expect(
         deposit.contract.connect(user1).exit(user2.address)
       ).to.be.revertedWithCustomError(deposit.contract, "NotClaimWallet");
+    });
+    it("Should reject when before exit time", async () => {
+      await deposit.contract.setExitEnabled(true);
+      await deposit.contract.setClaimWallet(user2.address);
+      const currentTime = await time.latest();
+      await deposit.contract.setExitStartTime(currentTime + 3600);
+      await expect(
+        deposit.contract.connect(user2).exit(user2.address)
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "ExitStartTimeNotPassed"
+      );
     });
   });
   describe("addWhitelistedToken", () => {

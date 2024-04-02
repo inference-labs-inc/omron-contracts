@@ -26,17 +26,10 @@ interface IOmronDeposit {
     function deposit(address _tokenAddress, uint256 _amount) external;
 
     /**
-     * @notice Withdraws a specified amount of a token from the contract
-     * @param _tokenAddress The address of the token to withdraw
-     * @param _amount The amount of the token to withdraw
+     * @notice Allows users to exit the contract entirely.
+     * @param _userAddress The address of the user to exit
      */
-    function withdraw(address _tokenAddress, uint256 _amount) external;
-
-    /**
-     * @notice Withdraws a specified amount of Ether from the contract
-     * @param _amount The amount of Ether to withdraw
-     */
-    function withdrawEther(uint256 _amount) external;
+    function exit(address _userAddress) external returns (uint256 points);
 
     /**
      * @notice Adds a token to the list of whitelisted tokens

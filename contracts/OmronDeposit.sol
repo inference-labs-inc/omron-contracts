@@ -18,6 +18,7 @@ using SafeERC20 for IERC20;
  */
 contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Structs
+
     /**
      * @notice A struct that holds information about a user's points and token balances
      */
@@ -79,7 +80,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error ExitDisabled();
     error ZeroAmount();
     error NotClaimWallet();
-    error NoClaimablePoints();
     error ClaimWalletNotSet();
     error ExitStartCannotBeRetroactive();
     error ExitStartTimeAlreadySet();
@@ -168,6 +168,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     // Owner only methods
+
     /**
      * @dev Add a new deposit token to the contract
      * @param _tokenAddress The address of the token to be added
@@ -273,7 +274,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * Will proceed to execution if exit start time isn't set, or if it is set to a date after the current time.
      */
     modifier onlyBeforeExitStartTime() {
-        if (exitStartTime != 0 && block.timestamp > exitStartTime) {
+        if (exitStartTime != 0 && block.timestamp >= exitStartTime) {
             revert ExitStartTimePassed();
         }
         _;
@@ -383,6 +384,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev Called by the claim contract to exit a user's position and claim all points for the user
      * @param _userAddress The address of the user to exit
+     * @return pointsClaimed The number of points claimed by the user
      */
     function exit(
         address _userAddress
@@ -392,20 +394,29 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         onlyAfterExitStartTime
         onlyClaimWallet
         whenExitEnabled
+        returns (uint256 pointsClaimed)
     {
         if (_userAddress == address(0)) {
             revert ZeroAddress();
         }
+
         UserInfo storage user = userInfo[_userAddress];
-        _claimPoints(user, _userAddress);
+
+        pointsClaimed = _claimPoints(user, _userAddress);
+
         for (uint256 i; i < whitelistedTokensCount; ) {
             IERC20 token = IERC20(allWhitelistedTokens[i]);
+
             if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
                 uint256 balance = user.tokenBalances[allWhitelistedTokens[i]];
+
                 token.safeTransfer(_userAddress, balance);
+
                 emit Withdrawal(_userAddress, allWhitelistedTokens[i], balance);
+
                 user.tokenBalances[allWhitelistedTokens[i]] = 0;
             }
+
             unchecked {
                 ++i;
             }
@@ -415,37 +426,20 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev Claim points from the contract
      * @param _user The user to claim points for
+     * @return pointsClaimed The number of points claimed by the user
      */
     function _claimPoints(
         UserInfo storage _user,
         address _claimAddress
-    ) private returns (uint256 claimAmount) {
-        // Check if the user has any points to claim. If not then revert.
-        if (_user.pointBalance == 0) {
-            revert NoClaimablePoints();
-        }
-
+    ) private returns (uint256 pointsClaimed) {
         _updatePoints(_user);
 
         // Return their current point balance, and set it to zero.
-        claimAmount = _user.pointBalance;
+        pointsClaimed = _user.pointBalance;
         _user.pointBalance = 0;
         _user.pointsPerHour = 0;
 
-        uint256 balance = user.tokenBalances[_tokenAddress];
-        if (balance < _amount) {
-            revert InsufficientBalance();
-        }
-
-        IERC20 token = IERC20(_tokenAddress);
-
-        _updatePoints(user);
-        user.tokenBalances[_tokenAddress] -= _amount;
-        user.pointsPerHour -= _amount;
-
-        token.safeTransfer(msg.sender, _amount);
-
-        emit Withdrawal(msg.sender, _tokenAddress, _amount);
+        emit PointsClaimed(_claimAddress, pointsClaimed, _user.pointBalance);
     }
 
     // Internal functions
