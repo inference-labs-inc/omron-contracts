@@ -67,7 +67,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice The time at which exits become enabled and points no longer accrue for any deposits.
      */
-    uint256 public exitStartTime;
+    uint256 public depositStopTime;
 
     // Custom Errors
     error ZeroAddress();
@@ -77,9 +77,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error NotClaimManager();
     error ClaimManagerNotSet();
     error ExitStartCannotBeRetroactive();
-    error ExitStartTimeAlreadySet();
-    error ExitStartTimeNotPassed();
-    error ExitStartTimePassed();
+    error DepositStopTimeAlreadySet();
+    error DepositStopTimeNotPassed();
+    error DepositStopTimePassed();
 
     // Events
 
@@ -182,16 +182,18 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @dev Set the timestamp of the end of the points accrual period. Points will no longer accrue for any deposits beyond this timestamp.
-     * @param _newExitStartTime The timestamp of the end of the points accrual period.
+     * @param _newDepositStopTime The timestamp of the end of the points accrual period.
      */
-    function setExitStartTime(uint256 _newExitStartTime) external onlyOwner {
-        if (exitStartTime != 0) {
-            revert ExitStartTimeAlreadySet();
+    function setDepositStopTime(
+        uint256 _newDepositStopTime
+    ) external onlyOwner {
+        if (depositStopTime != 0) {
+            revert DepositStopTimeAlreadySet();
         }
-        if (_newExitStartTime < block.timestamp) {
+        if (_newDepositStopTime < block.timestamp) {
             revert ExitStartCannotBeRetroactive();
         }
-        exitStartTime = _newExitStartTime;
+        depositStopTime = _newDepositStopTime;
     }
 
     /**
@@ -234,22 +236,22 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev A modifier that checks whether the current time is after the exit start time.
+     * @dev A modifier that checks whether the current time is after the deposit stop time.
      */
-    modifier onlyAfterExitStartTime() {
-        if (block.timestamp < exitStartTime) {
-            revert ExitStartTimeNotPassed();
+    modifier onlyAfterDepositStopTime() {
+        if (block.timestamp < depositStopTime) {
+            revert DepositStopTimeNotPassed();
         }
         _;
     }
 
     /**
-     * @dev A modifier that checkes whether the current time is before the exit start time.
-     * Will proceed to execution if exit start time isn't set, or if it is set to a date after the current time.
+     * @dev A modifier that checkes whether the current time is before the deposit stop time.
+     * Will proceed to execution if deposit stop time isn't set, or if it is set to a date after the current time.
      */
-    modifier onlyBeforeExitStartTime() {
-        if (exitStartTime != 0 && block.timestamp >= exitStartTime) {
-            revert ExitStartTimePassed();
+    modifier onlyBeforeDepositStopTime() {
+        if (depositStopTime != 0 && block.timestamp >= depositStopTime) {
+            revert DepositStopTimePassed();
         }
         _;
     }
@@ -332,7 +334,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function deposit(
         address _tokenAddress,
         uint256 _amount
-    ) external nonReentrant whenNotPaused onlyBeforeExitStartTime {
+    ) external nonReentrant whenNotPaused onlyBeforeDepositStopTime {
         if (_amount == 0) {
             revert ZeroAmount();
         }
@@ -365,7 +367,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     )
         external
         nonReentrant
-        onlyAfterExitStartTime
+        onlyAfterDepositStopTime
         onlyClaimManager
         whenExitEnabled
         returns (uint256 pointsClaimed)
@@ -406,10 +408,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
             uint256 timeElapsed = block.timestamp - _user.lastUpdated;
-            // If the current time is after the exitStartTime and it is non-zero, then use it to determine time elapsed,
-            // since no points are being accrued after exit start
-            if (block.timestamp > exitStartTime && exitStartTime != 0) {
-                timeElapsed = exitStartTime - _user.lastUpdated;
+            // If the current time is after the depositStopTime and it is non-zero, then use it to determine time elapsed,
+            // since no points are being accrued after deposit stop
+            if (block.timestamp > depositStopTime && depositStopTime != 0) {
+                timeElapsed = depositStopTime - _user.lastUpdated;
             }
             uint256 pointsEarned = (timeElapsed *
                 _user.pointsPerHour *
