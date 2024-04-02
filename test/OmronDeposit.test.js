@@ -36,13 +36,13 @@ describe("OmronDeposit", () => {
 
       const txHash = deposit.hash;
       const tx = await ethers.provider.getTransaction(txHash);
-      console.log(tx);
+
       const receipt = await ethers.provider.getTransactionReceipt(txHash);
-      console.log(receipt);
+
       const events = receipt.logs.map((x) =>
         deposit.contract.interface.parseLog(x)
       );
-      console.log(events);
+
       const whitelistedTokenEvents = events.filter(
         (x) => x.name === "WhitelistedTokenAdded"
       );
@@ -289,9 +289,6 @@ describe("OmronDeposit", () => {
       await expect(mockClaimContract.contract.exit(user2.address))
         .to.emit(mockClaimContract.contract, "ClaimSuccess")
         .withArgs(user2.address, parseEther("1"));
-      expect(await token1.contract.balanceOf(user2.address)).to.equal(
-        parseEther("1")
-      );
     });
     it("Should accept exit and reduce user's point balance to zero", async () => {
       await deposit.contract.setExitEnabled(true);
@@ -330,7 +327,6 @@ describe("OmronDeposit", () => {
       // Simulate nearly 2 hours passing
       await time.increase(exitStartTime - currentTime - 3);
       const nowTime = await time.latest();
-      console.log(currentTime, nowTime, exitStartTime);
 
       // Make a last-second deposit
       await depositTokens(deposit, token1, parseEther("1"), user2);
@@ -347,17 +343,11 @@ describe("OmronDeposit", () => {
 
       // Perform exit and verify event emission
       await expect(deposit.contract.connect(user1).exit(user2.address))
-        .to.emit(deposit.contract, "PointsClaimed")
+        .to.emit(deposit.contract, "Exit")
         .withArgs(
           user2.address,
-          parseEther("2") + additionalPointsFromLastDeposit,
-          parseEther("0")
+          parseEther("2") + additionalPointsFromLastDeposit
         );
-
-      // Verify token balance remains unchanged after exit
-      expect(await token1.contract.balanceOf(user2.address)).to.equal(
-        parseEther("2")
-      );
 
       // Confirm point balance is reset to zero after exit
       const postExitInfo = await deposit.contract.getUserInfo(user2.address);

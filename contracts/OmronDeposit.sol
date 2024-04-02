@@ -96,16 +96,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     );
 
     /**
-     * Emitted when a user withdraws ERC20 tokens from the contract
-     * @param to The address of the user that withdrew the tokens
-     * @param tokenAddress The address of the token that was withdrawn
-     * @param amount The amount of the token that was withdrawn
+     * Emitted when a user exits the contract
+     * @param user The address of the user that exited
+     * @param pointsClaimed The number of points the user claimed
      */
-    event Withdrawal(
-        address indexed to,
-        address indexed tokenAddress,
-        uint256 amount
-    );
+    event Exit(address indexed user, uint256 pointsClaimed);
 
     /**
      * Emitted when the exit enabled state of the contract is changed
@@ -118,18 +113,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @param _tokenAddress The address of the token that was added to the whitelist
      */
     event WhitelistedTokenAdded(address indexed _tokenAddress);
-
-    /**
-     * Emitted when points are claimed by a user
-     * @param user The address of the user that claimed the points
-     * @param amountClaimed The amount of points claimed by the user
-     * @param newPointBalance The new point balance of the user after the points are claimed
-     */
-    event PointsClaimed(
-        address indexed user,
-        uint256 amountClaimed,
-        uint256 newPointBalance
-    );
 
     /**
      * Emitted when the claim wallet is set
@@ -393,25 +376,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         UserInfo storage user = userInfo[_userAddress];
 
-        pointsClaimed = _claimPoints(user, _userAddress);
+        pointsClaimed = _claimPoints(user);
 
-        for (uint256 i; i < allWhitelistedTokens.length; ) {
-            IERC20 token = IERC20(allWhitelistedTokens[i]);
-
-            if (user.tokenBalances[allWhitelistedTokens[i]] > 0) {
-                uint256 balance = user.tokenBalances[allWhitelistedTokens[i]];
-
-                token.safeTransfer(_userAddress, balance);
-
-                emit Withdrawal(_userAddress, allWhitelistedTokens[i], balance);
-
-                user.tokenBalances[allWhitelistedTokens[i]] = 0;
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
+        emit Exit(_userAddress, pointsClaimed);
     }
 
     /**
@@ -420,8 +387,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @return pointsClaimed The number of points claimed by the user
      */
     function _claimPoints(
-        UserInfo storage _user,
-        address _claimAddress
+        UserInfo storage _user
     ) private returns (uint256 pointsClaimed) {
         _updatePoints(_user);
 
@@ -429,8 +395,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         pointsClaimed = _user.pointBalance;
         _user.pointBalance = 0;
         _user.pointsPerHour = 0;
-
-        emit PointsClaimed(_claimAddress, pointsClaimed, _user.pointBalance);
     }
 
     // Internal functions
