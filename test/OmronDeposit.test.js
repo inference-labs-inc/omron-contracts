@@ -249,6 +249,23 @@ describe("OmronDeposit", () => {
         );
       }
     });
+    it("Should reset allowance for previous claim manager to zero before setting allowance for new claim manager", async () => {
+      await deposit.contract.connect(owner).setClaimManager(user2.address);
+      for (const token of erc20Deployments) {
+        expect(await token.contract.allowance(deposit.address, user2)).to.equal(
+          MaxUint256
+        );
+      }
+      await deposit.contract.connect(owner).setClaimManager(user1.address);
+      for (const token of erc20Deployments) {
+        expect(await token.contract.allowance(deposit.address, user2)).to.equal(
+          0
+        );
+        expect(
+          await token1.contract.allowance(deposit.address, user1)
+        ).to.equal(MaxUint256);
+      }
+    });
     it("Should not set claim manager provided zero address", async () => {
       await expect(
         deposit.contract.connect(owner).setClaimManager(ZeroAddress)
@@ -354,7 +371,7 @@ describe("OmronDeposit", () => {
 
       // Perform claim and verify event emission
       await expect(deposit.contract.connect(user1).claim(user2.address))
-        .to.emit(deposit.contract, "Claim")
+        .to.emit(deposit.contract, "ClaimPoints")
         .withArgs(
           user2.address,
           parseEther("2") + additionalPointsFromLastDeposit

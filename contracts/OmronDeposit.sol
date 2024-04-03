@@ -96,11 +96,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     );
 
     /**
-     * Emitted when a user claims the contract
+     * Emitted when a user claims their points via the claim contract
      * @param user The address of the user that claimed
      * @param pointsClaimed The number of points the user claimed
      */
-    event Claim(address indexed user, uint256 pointsClaimed);
+    event ClaimPoints(address indexed user, uint256 pointsClaimed);
 
     /**
      * Emitted when the claim enabled state of the contract is changed
@@ -170,23 +170,31 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @dev Set the address of the contract which is allowed to claim points on behalf of users. Can be set to the null address to disable claims.
-     * @param _claimManager The address of the contract which is allowed to claim points on behalf of users.
+     * @param _newClaimManager The address of the contract which is allowed to claim points on behalf of users.
      */
-    function setClaimManager(address _claimManager) external onlyOwner {
-        if (_claimManager == address(0)) {
+    function setClaimManager(address _newClaimManager) external onlyOwner {
+        if (_newClaimManager == address(0)) {
             revert ZeroAddress();
         }
-        claimManager = _claimManager;
+
         for (uint256 i; i < allWhitelistedTokens.length; ) {
-            IERC20(allWhitelistedTokens[i]).approve(
-                _claimManager,
-                type(uint256).max
-            );
+            IERC20 token = IERC20(allWhitelistedTokens[i]);
+
+            // Reset approval for old claim manager back to zero, in case one was set previously
+            if (claimManager != address(0)) {
+                token.approve(claimManager, 0);
+            }
+            // Set approval for the new claim manager to max UInt256
+            token.approve(_newClaimManager, type(uint256).max);
+
             unchecked {
                 i++;
             }
         }
-        emit ClaimManagerSet(_claimManager);
+        // Set the new claim manager
+        claimManager = _newClaimManager;
+
+        emit ClaimManagerSet(_newClaimManager);
     }
 
     /**
@@ -224,7 +232,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev modifier that checks if claim functionality is enabled
      */
-    modifier whenClaimEnabled() {
+    modifier whileClaimEnabled() {
         if (!claimEnabled) {
             revert ClaimDisabled();
         }
@@ -378,7 +386,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         nonReentrant
         onlyAfterDepositStopTime
         onlyClaimManager
-        whenClaimEnabled
+        whileClaimEnabled
         returns (uint256 pointsClaimed)
     {
         if (_userAddress == address(0)) {
@@ -389,7 +397,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         pointsClaimed = _claimPoints(user);
 
-        emit Claim(_userAddress, pointsClaimed);
+        emit ClaimPoints(_userAddress, pointsClaimed);
     }
 
     /**
