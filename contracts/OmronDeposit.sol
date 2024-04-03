@@ -198,7 +198,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             }
 
             unchecked {
-                i++;
+                ++i;
             }
         }
         // Set the new claim manager
