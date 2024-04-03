@@ -80,6 +80,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     error DepositStopTimeAlreadySet();
     error DepositStopTimeNotPassed();
     error DepositStopTimePassed();
+    error ApprovalFailed();
 
     // Events
 
@@ -182,10 +183,19 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
             // Reset approval for old claim manager back to zero, in case one was set previously
             if (claimManager != address(0)) {
-                token.approve(claimManager, 0);
+                bool _revokeApprovalSuccess = token.approve(claimManager, 0);
+                if (!_revokeApprovalSuccess) {
+                    revert ApprovalFailed();
+                }
             }
             // Set approval for the new claim manager to max UInt256
-            token.approve(_newClaimManager, type(uint256).max);
+            bool _setApprovalSuccess = token.approve(
+                _newClaimManager,
+                type(uint256).max
+            );
+            if (!_setApprovalSuccess) {
+                revert ApprovalFailed();
+            }
 
             unchecked {
                 i++;

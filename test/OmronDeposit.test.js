@@ -266,6 +266,17 @@ describe("OmronDeposit", () => {
         ).to.equal(MaxUint256);
       }
     });
+    it("Should revert if any allowance can not be set", async () => {
+      await deposit.contract.addWhitelistedToken(brokenERC20.address);
+      await brokenERC20.contract.setApprovalRejectAmount(MaxUint256);
+      await expect(
+        deposit.contract.connect(owner).setClaimManager(user1.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "ApprovalFailed");
+      await brokenERC20.contract.setApprovalRejectAmount(0);
+      await expect(
+        deposit.contract.connect(owner).setClaimManager(user1.address)
+      ).to.not.be.revertedWithCustomError(deposit.contract, "ApprovalFailed");
+    });
     it("Should not set claim manager provided zero address", async () => {
       await expect(
         deposit.contract.connect(owner).setClaimManager(ZeroAddress)
@@ -381,6 +392,7 @@ describe("OmronDeposit", () => {
       const postClaimInfo = await deposit.contract.getUserInfo(user2.address);
       expect(postClaimInfo.pointBalance).to.equal(parseEther("0"));
     });
+
     it("Should reject when claim disabled", async () => {
       await deposit.contract.setClaimManager(user1.address);
       await expect(

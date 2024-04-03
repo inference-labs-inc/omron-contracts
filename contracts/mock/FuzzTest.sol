@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {OmronDeposit} from "../OmronDeposit.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "hardhat/console.sol";
 
 contract MockToken is ERC20 {
     constructor() ERC20("MockToken", "MTK") {
@@ -14,18 +13,17 @@ contract MockToken is ERC20 {
 contract OmronDepositTest is OmronDeposit {
     MockToken public token;
     bool private initialized = false;
-    address[] public tokens = [address(token)];
 
-    constructor() OmronDeposit(msg.sender, tokens) {}
+    constructor() OmronDeposit(msg.sender, new address[](0)) {}
 
     function echidna_points_decimals_18() public returns (bool) {
         return (POINTS_DECIMALS == 18);
     }
 
     function echidna_test_whitelisted_tokens() public returns (bool) {
-        address[] memory tokens = allWhitelistedTokens;
-        for (uint i = 0; i < tokens.length; i++) {
-            if (!whitelistedTokens[tokens[i]]) {
+        address[] memory _tokens = allWhitelistedTokens;
+        for (uint i = 0; i < _tokens.length; i++) {
+            if (!whitelistedTokens[_tokens[i]]) {
                 return false;
             }
         }
