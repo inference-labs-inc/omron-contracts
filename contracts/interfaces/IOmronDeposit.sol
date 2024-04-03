@@ -9,12 +9,12 @@ pragma solidity 0.8.21;
 interface IOmronDeposit {
     /**
      * @notice Struct to store user information including token balances and points
-     * @dev UserInfo struct contains mappings for token balances and variables for point tracking
+     * @dev UserInfo struct contains mappings for token balances and variables for points tracking
      */
     struct UserInfo {
-        mapping(address tokenAddress => uint256 balanceAmount) tokenBalances; // Mapping of token addresses to their respective balances for a user
+        mapping(address => uint256) tokenBalances; // Mapping of token addresses to their respective balances for a user
         uint256 pointBalance; // Total points balance of the user
-        uint256 pointsPerSecond; // Rate at which the user earns points per second
+        uint256 pointsPerHour; // Rate at which the user earns points per hour
         uint256 lastUpdated; // Timestamp of the last update to user's points
     }
 
@@ -26,10 +26,13 @@ interface IOmronDeposit {
     function deposit(address _tokenAddress, uint256 _amount) external;
 
     /**
-     * @notice Allows users to exit the contract entirely.
-     * @param _userAddress The address of the user to exit
+     * @notice Allows users to claim their points.
+     * @param _userAddress The address of the user claiming points
+     * @return pointsClaimed The total points claimed by the user
      */
-    function exit(address _userAddress) external returns (uint256 points);
+    function claim(
+        address _userAddress
+    ) external returns (uint256 pointsClaimed);
 
     /**
      * @notice Adds a token to the list of whitelisted tokens
@@ -38,10 +41,22 @@ interface IOmronDeposit {
     function addWhitelistedToken(address _tokenAddress) external;
 
     /**
-     * @notice Enables or disables withdrawals from the contract
-     * @param _enabled Boolean indicating whether withdrawals should be enabled
+     * @notice Enables or disables claim functionality
+     * @param _enabled Boolean indicating whether claims should be enabled
      */
-    function setWithdrawalsEnabled(bool _enabled) external;
+    function setClaimEnabled(bool _enabled) external;
+
+    /**
+     * @notice Sets the address of the claim manager contract
+     * @param _claimManager The address of the claim manager
+     */
+    function setClaimManager(address _claimManager) external;
+
+    /**
+     * @notice Sets the timestamp after which points no longer accrue
+     * @param _newDepositStopTime The timestamp to set
+     */
+    function setDepositStopTime(uint256 _newDepositStopTime) external;
 
     /**
      * @notice Pauses the contract, disabling deposits
@@ -83,9 +98,9 @@ interface IOmronDeposit {
     ) external view returns (uint256 balance);
 
     /**
-     * @notice Returns detailed user information including points per second, last updated timestamp, and point balance
+     * @notice Returns detailed user information including points per hour, last updated timestamp, and point balance
      * @param _userAddress The address of the user
-     * @return pointsPerSecond The rate at which the user earns points per second
+     * @return pointsPerHour The rate at which the user earns points per hour
      * @return lastUpdated The timestamp of the last update to user's points
      * @return pointBalance The total points balance of the user
      */
@@ -95,7 +110,7 @@ interface IOmronDeposit {
         external
         view
         returns (
-            uint256 pointsPerSecond,
+            uint256 pointsPerHour,
             uint256 lastUpdated,
             uint256 pointBalance
         );
@@ -114,40 +129,27 @@ interface IOmronDeposit {
     );
 
     /**
-     * @dev Emitted when a user withdraws ERC20 tokens from the contract
-     * @param to The address of the user that withdrew the tokens
-     * @param tokenAddress The address of the token that was withdrawn
-     * @param amount The amount of the token that was withdrawn
+     * @dev Emitted when a user claims points
+     * @param user The address of the user that claimed
+     * @param pointsClaimed The number of points claimed by the user
      */
-    event Withdrawal(
-        address indexed to,
-        address indexed tokenAddress,
-        uint256 amount
-    );
+    event Claim(address indexed user, uint256 pointsClaimed);
 
     /**
-     * @dev Emitted when a user deposits Ether into the contract
-     * @param from The address of the user that deposited the Ether
-     * @param amount The amount of Ether that was deposited
+     * @dev Emitted when the claim enabled state is changed
+     * @param _enabled The new state of claim enabled
      */
-    event EtherDeposit(address indexed from, uint256 amount);
-
-    /**
-     * @dev Emitted when a user withdraws Ether from the contract
-     * @param to The address of the user that withdrew the Ether
-     * @param amount The amount of Ether that was withdrawn
-     */
-    event EtherWithdrawal(address indexed to, uint256 amount);
-
-    /**
-     * @dev Emitted when the withdrawals enabled state is changed
-     * @param _enabled The new state of withdrawals enabled
-     */
-    event WithdrawalsEnabled(bool indexed _enabled);
+    event ClaimEnabled(bool indexed _enabled);
 
     /**
      * @dev Emitted when a new token is added to the whitelist
      * @param _tokenAddress The address of the token that was whitelisted
      */
     event WhitelistedTokenAdded(address indexed _tokenAddress);
+
+    /**
+     * @dev Emitted when the claim manager is set
+     * @param _claimManager The address of the claim manager
+     */
+    event ClaimManagerSet(address indexed _claimManager);
 }

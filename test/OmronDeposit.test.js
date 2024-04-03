@@ -134,8 +134,8 @@ describe("OmronDeposit", () => {
         "ZeroAmount"
       );
     });
-    it("Should reject deposit when past exit start time", async () => {
-      await deposit.contract.setExitEnabled(true);
+    it("Should reject deposit when past deposit stop time", async () => {
+      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
       await deposit.contract.setDepositStopTime(currentTime + 3600);
@@ -216,21 +216,21 @@ describe("OmronDeposit", () => {
       expect(balance).to.equal(parseEther("1"));
     });
   });
-  describe("setExitEnabled", () => {
+  describe("setClaimEnabled", () => {
     it("Should reject when not owner", async () => {
       await expect(
-        deposit.contract.connect(user1).setExitEnabled(true)
+        deposit.contract.connect(user1).setClaimEnabled(true)
       ).to.be.revertedWithCustomError(
         deposit.contract,
         "OwnableUnauthorizedAccount"
       );
     });
     it("Should set claims enabled when owner", async () => {
-      await expect(deposit.contract.connect(owner).setExitEnabled(true))
-        .to.emit(deposit.contract, "ExitEnabled")
+      await expect(deposit.contract.connect(owner).setClaimEnabled(true))
+        .to.emit(deposit.contract, "ClaimEnabled")
         .withArgs(true);
-      const exitEnabled = await deposit.contract.exitEnabled();
-      expect(exitEnabled).to.equal(true);
+      const claimEnabled = await deposit.contract.claimEnabled();
+      expect(claimEnabled).to.equal(true);
     });
   });
   describe("setClaimManager", () => {
@@ -257,7 +257,7 @@ describe("OmronDeposit", () => {
   });
 
   describe("setDepositStopTime", () => {
-    it("Should prevent setting a new exit start time once one is selected", async () => {
+    it("Should prevent setting a new deposit stop time once one is selected", async () => {
       const currentTime = await time.latest();
       await deposit.contract.setDepositStopTime(currentTime + 3605);
       await expect(
@@ -267,34 +267,34 @@ describe("OmronDeposit", () => {
         "DepositStopTimeAlreadySet"
       );
     });
-    it("Should prevent setting a new exit start time before the current time", async () => {
+    it("Should prevent setting a new deposit stop time before the current time", async () => {
       const currentTime = await time.latest();
       await expect(
         deposit.contract.connect(owner).setDepositStopTime(currentTime - 1)
       ).to.be.revertedWithCustomError(
         deposit.contract,
-        "ExitStartCannotBeRetroactive"
+        "DepositStopCannotBeRetroactive"
       );
     });
   });
-  describe("exit", () => {
-    it("Should correctly exit using mock claim contract", async () => {
+  describe("claim", () => {
+    it("Should correctly claim using mock claim contract", async () => {
       const mockClaimContract = await deployMockClaimContractFixture(
         deposit.address
       );
       await deposit.contract.setClaimManager(mockClaimContract.address);
-      await deposit.contract.setExitEnabled(true);
+      await deposit.contract.setClaimEnabled(true);
       await token1.contract.transfer(user2.address, parseEther("1"));
       await addAllowance(token1, user2, deposit, parseEther("2"));
       await depositTokens(deposit, token1, parseEther("1"), user2);
       await deposit.contract.setDepositStopTime((await time.latest()) + 3600);
       await time.increase(3600);
-      await expect(mockClaimContract.contract.exit(user2.address))
-        .to.emit(mockClaimContract.contract, "ClaimSuccess")
+      await expect(mockClaimContract.contract.claimPoints(user2.address))
+        .to.emit(mockClaimContract.contract, "PointsClaimed")
         .withArgs(user2.address, parseEther("1"));
     });
-    it("Should accept exit and reduce user's point balance to zero", async () => {
-      await deposit.contract.setExitEnabled(true);
+    it("Should accept claim and reduce user's point balance to zero", async () => {
+      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
       await deposit.contract.setDepositStopTime(currentTime + 3605);
@@ -305,12 +305,12 @@ describe("OmronDeposit", () => {
       await depositTokens(deposit, token1, parseEther("1"), user2);
       const initialInfo = await deposit.contract.getUserInfo(user2.address);
       expect(initialInfo.pointBalance).to.equal(parseEther("1"));
-      await deposit.contract.connect(user1).exit(user2.address);
+      await deposit.contract.connect(user1).claim(user2.address);
       const info = await deposit.contract.getUserInfo(user2.address);
       expect(info.pointBalance).to.equal(parseEther("0"));
     });
-    it("Should correctly handle point accrual and exit process", async () => {
-      await deposit.contract.setExitEnabled(true);
+    it("Should correctly handle point accrual and claim process", async () => {
+      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
 
       // Transfer and allow tokens for deposit
@@ -321,10 +321,10 @@ describe("OmronDeposit", () => {
 
       await depositTokens(deposit, token1, parseEther("1"), user2);
       const currentTime = await time.latest();
-      // In two hours, the contract will switch to exit mode
+      // In two hours, the contract will switch to claim mode
       const depositStopTime = currentTime + 7201;
 
-      // Set exit start time to 2 hours in the future
+      // Set deposit stop time to 2 hours in the future
       await deposit.contract.setDepositStopTime(depositStopTime);
 
       // Simulate nearly 2 hours passing
@@ -337,64 +337,64 @@ describe("OmronDeposit", () => {
         "0.000555555555555555"
       );
 
-      // Simulate another hour passing, post-exit start time
+      // Simulate another hour passing, post-deposit stop time
       await time.increase(3600);
 
-      // Verify initial point balance before exit
+      // Verify initial point balance before claim
       const initialInfo = await deposit.contract.getUserInfo(user2.address);
       expect(initialInfo.pointBalance).to.equal(parseEther("2"));
 
-      // Perform exit and verify event emission
-      await expect(deposit.contract.connect(user1).exit(user2.address))
-        .to.emit(deposit.contract, "Exit")
+      // Perform claim and verify event emission
+      await expect(deposit.contract.connect(user1).claim(user2.address))
+        .to.emit(deposit.contract, "Claim")
         .withArgs(
           user2.address,
           parseEther("2") + additionalPointsFromLastDeposit
         );
 
-      // Confirm point balance is reset to zero after exit
-      const postExitInfo = await deposit.contract.getUserInfo(user2.address);
-      expect(postExitInfo.pointBalance).to.equal(parseEther("0"));
+      // Confirm point balance is reset to zero after claim
+      const postClaimInfo = await deposit.contract.getUserInfo(user2.address);
+      expect(postClaimInfo.pointBalance).to.equal(parseEther("0"));
     });
-    it("Should reject when exit disabled", async () => {
+    it("Should reject when claim disabled", async () => {
       await deposit.contract.setClaimManager(user1.address);
       await expect(
-        deposit.contract.connect(user1).exit(user2.address)
-      ).to.be.revertedWithCustomError(deposit.contract, "ExitDisabled");
+        deposit.contract.connect(user1).claim(user2.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "ClaimDisabled");
     });
     it("Should reject when claim address is null", async () => {
-      await deposit.contract.setExitEnabled(true);
+      await deposit.contract.setClaimEnabled(true);
       const currentTime = await time.latest();
       await deposit.contract.setDepositStopTime(currentTime + 1);
       await expect(
-        deposit.contract.exit(user1.address)
+        deposit.contract.claim(user1.address)
       ).to.be.revertedWithCustomError(deposit.contract, "ClaimManagerNotSet");
     });
-    it("Should reject exit for null address", async () => {
-      await deposit.contract.setExitEnabled(true);
+    it("Should reject claim for null address", async () => {
+      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
       await deposit.contract.setDepositStopTime(currentTime + 1);
       await expect(
-        deposit.contract.connect(user1).exit(ZeroAddress)
+        deposit.contract.connect(user1).claim(ZeroAddress)
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
     it("Should reject when not claim address", async () => {
-      await deposit.contract.setExitEnabled(true);
+      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user2.address);
       const currentTime = await time.latest();
       await deposit.contract.setDepositStopTime(currentTime + 1);
       await expect(
-        deposit.contract.connect(user1).exit(user2.address)
+        deposit.contract.connect(user1).claim(user2.address)
       ).to.be.revertedWithCustomError(deposit.contract, "NotClaimManager");
     });
-    it("Should reject when before exit time", async () => {
-      await deposit.contract.setExitEnabled(true);
+    it("Should reject when before claim time", async () => {
+      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user2.address);
       const currentTime = await time.latest();
       await deposit.contract.setDepositStopTime(currentTime + 3600);
       await expect(
-        deposit.contract.connect(user2).exit(user2.address)
+        deposit.contract.connect(user2).claim(user2.address)
       ).to.be.revertedWithCustomError(
         deposit.contract,
         "DepositStopTimeNotPassed"

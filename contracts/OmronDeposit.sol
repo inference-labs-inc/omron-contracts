@@ -45,9 +45,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Variables
 
     /**
-     * @notice A boolean that indicates if exiting is enabled
+     * @notice A boolean that indicates if claiming is enabled
      */
-    bool public exitEnabled;
+    bool public claimEnabled;
 
     /**
      * @notice The number of decimal places for points
@@ -65,18 +65,18 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     address public claimManager;
 
     /**
-     * @notice The time at which exits become enabled and points no longer accrue for any deposits.
+     * @notice The time at which claims become enabled and points no longer accrue for any deposits.
      */
     uint256 public depositStopTime;
 
     // Custom Errors
     error ZeroAddress();
     error TokenNotWhitelisted();
-    error ExitDisabled();
+    error ClaimDisabled();
     error ZeroAmount();
     error NotClaimManager();
     error ClaimManagerNotSet();
-    error ExitStartCannotBeRetroactive();
+    error DepositStopCannotBeRetroactive();
     error DepositStopTimeAlreadySet();
     error DepositStopTimeNotPassed();
     error DepositStopTimePassed();
@@ -96,17 +96,17 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     );
 
     /**
-     * Emitted when a user exits the contract
-     * @param user The address of the user that exited
+     * Emitted when a user claims the contract
+     * @param user The address of the user that claimed
      * @param pointsClaimed The number of points the user claimed
      */
-    event Exit(address indexed user, uint256 pointsClaimed);
+    event Claim(address indexed user, uint256 pointsClaimed);
 
     /**
-     * Emitted when the exit enabled state of the contract is changed
-     * @param _enabled The new state of exit enabled
+     * Emitted when the claim enabled state of the contract is changed
+     * @param _enabled The new state of claim enabled
      */
-    event ExitEnabled(bool indexed _enabled);
+    event ClaimEnabled(bool indexed _enabled);
 
     /**
      * Emitted when a new token is added to the whitelist
@@ -115,8 +115,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     event WhitelistedTokenAdded(address indexed _tokenAddress);
 
     /**
-     * Emitted when the claim wallet is set
-     * @param _claimManager The address of the new claim wallet
+     * Emitted when the claim manager contract is set
+     * @param _claimManager The address of the new claim manager contract
      */
     event ClaimManagerSet(address indexed _claimManager);
 
@@ -160,12 +160,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev Set the exit enabled state of the contract
-     * @param _enabled The new state of exit enabled
+     * @dev Set the claim enabled state of the contract
+     * @param _enabled The new state of claim enabled
      */
-    function setExitEnabled(bool _enabled) external onlyOwner {
-        exitEnabled = _enabled;
-        emit ExitEnabled(_enabled);
+    function setClaimEnabled(bool _enabled) external onlyOwner {
+        claimEnabled = _enabled;
+        emit ClaimEnabled(_enabled);
     }
 
     /**
@@ -177,6 +177,15 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert ZeroAddress();
         }
         claimManager = _claimManager;
+        for (uint256 i; i < allWhitelistedTokens.length; ) {
+            IERC20(allWhitelistedTokens[i]).approve(
+                _claimManager,
+                type(uint256).max
+            );
+            unchecked {
+                i++;
+            }
+        }
         emit ClaimManagerSet(_claimManager);
     }
 
@@ -191,7 +200,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             revert DepositStopTimeAlreadySet();
         }
         if (_newDepositStopTime < block.timestamp) {
-            revert ExitStartCannotBeRetroactive();
+            revert DepositStopCannotBeRetroactive();
         }
         depositStopTime = _newDepositStopTime;
     }
@@ -213,17 +222,17 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Modifiers
 
     /**
-     * @dev modifier that checks if exit functionality is enabled
+     * @dev modifier that checks if claim functionality is enabled
      */
-    modifier whenExitEnabled() {
-        if (!exitEnabled) {
-            revert ExitDisabled();
+    modifier whenClaimEnabled() {
+        if (!claimEnabled) {
+            revert ClaimDisabled();
         }
         _;
     }
 
     /**
-     * @dev A modifier that checks if the claim wallet is set and the sender is the claim wallet
+     * @dev A modifier that checks if the claim manager contract address is set and the sender is the claim manager contract
      */
     modifier onlyClaimManager() {
         if (claimManager == address(0)) {
@@ -358,18 +367,18 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev Called by the claim contract to exit a user's position and claim all points for the user
-     * @param _userAddress The address of the user to exit
+     * @dev Called by the claim manager to claim all points for the user
+     * @param _userAddress The address of the user to claim for
      * @return pointsClaimed The number of points claimed by the user
      */
-    function exit(
+    function claim(
         address _userAddress
     )
         external
         nonReentrant
         onlyAfterDepositStopTime
         onlyClaimManager
-        whenExitEnabled
+        whenClaimEnabled
         returns (uint256 pointsClaimed)
     {
         if (_userAddress == address(0)) {
@@ -380,7 +389,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
 
         pointsClaimed = _claimPoints(user);
 
-        emit Exit(_userAddress, pointsClaimed);
+        emit Claim(_userAddress, pointsClaimed);
     }
 
     /**
