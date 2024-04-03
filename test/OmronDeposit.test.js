@@ -1,6 +1,6 @@
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { ZeroAddress, parseEther } from "ethers";
+import { MaxUint256, ZeroAddress, parseEther } from "ethers";
 import { deployContract } from "../helpers/deployment.js";
 import {
   deployDepositContractFixture,
@@ -26,7 +26,7 @@ describe("OmronDeposit", () => {
     [token1, token2] = erc20Deployments;
   });
   describe("constructor", () => {
-    it("Should revert with zeroaddress if any whitelisted token is zero address", async () => {
+    it("Should revert with ZeroAddress if any whitelisted token is zero address", async () => {
       await expect(
         deployContract("OmronDeposit", [owner.address, [ZeroAddress]])
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
@@ -234,19 +234,27 @@ describe("OmronDeposit", () => {
     });
   });
   describe("setClaimManager", () => {
-    it("Should set claim wallet when owner", async () => {
+    it("Should set claim manager when owner", async () => {
       await expect(
         deposit.contract.connect(owner).setClaimManager(user2.address)
       )
         .to.emit(deposit.contract, "ClaimManagerSet")
         .withArgs(user2.address);
     });
-    it("Should not set claim wallet provided zero address", async () => {
+    it("Should add max allowance to the claim manager for all whitelisted tokens", async () => {
+      await deposit.contract.connect(owner).setClaimManager(user2.address);
+      for (const token of erc20Deployments) {
+        expect(await token.contract.allowance(deposit.address, user2)).to.equal(
+          MaxUint256
+        );
+      }
+    });
+    it("Should not set claim manager provided zero address", async () => {
       await expect(
         deposit.contract.connect(owner).setClaimManager(ZeroAddress)
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
-    it("Should not set claim wallet when not owner", async () => {
+    it("Should not set claim manager when not owner", async () => {
       await expect(
         deposit.contract.connect(user1).setClaimManager(user2.address)
       ).to.be.revertedWithCustomError(
