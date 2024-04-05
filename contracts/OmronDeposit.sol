@@ -225,7 +225,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev A modifier that checks whether the current time is after the deposit stop time.
+     * @dev A modifier that checks whether the deposit stop time hasn't been set.
+     * If the deposit stop time has not been set, then the function will revert.
      */
     modifier onlyAfterDepositStop() {
         if (depositStopTime == 0) {
@@ -235,8 +236,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev A modifier that checkes whether the current time is before the deposit stop time.
-     * Will proceed to execution if deposit stop time isn't set, or if it is set to a date after the current time.
+     * @dev A modifier that checkes whether the deposit stop time has been set.
+     * If it has been set, then the function will revert.
      */
     modifier onlyBeforeDepositStop() {
         if (depositStopTime != 0) {
