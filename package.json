@@ -10,6 +10,7 @@
     "dev": "REPORT_GAS=true hardhat run scripts/deploy.js --network localhost",
     "deploy:sepolia": "REPORT_GAS=true hardhat run scripts/deploy.js --network sepolia",
     "deploy:mainnet": "REPORT_GAS=true hardhat run scripts/deploy.js --network mainnet",
+    "analyze": "./analyze.sh",
     "types": "abi-types-generator hardhat"
   },
   "keywords": [
