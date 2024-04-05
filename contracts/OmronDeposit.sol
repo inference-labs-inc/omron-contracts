@@ -349,6 +349,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         emit Deposit(msg.sender, _tokenAddress, _amount);
     }
 
+    /**
+     * @notice Withdraw tokens from the contract
+     * @dev Called by the claim manager to withdraw tokens on a user's behalf
+     * @param _userAddress The address of the user to withdraw the tokens from
+     * @return withdrawnAmounts An array of the amounts of the tokens that were withdrawn
+     */
     function withdrawTokens(
         address _userAddress
     )
