@@ -1,6 +1,6 @@
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { MaxUint256, ZeroAddress, parseEther } from "ethers";
+import { ZeroAddress, parseEther } from "ethers";
 import { deployContract } from "../helpers/deployment.js";
 import {
   deployDepositContractFixture,
@@ -135,10 +135,9 @@ describe("OmronDeposit", () => {
       );
     });
     it("Should reject deposit when past deposit stop time", async () => {
-      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
-      await deposit.contract.setDepositStopTime(currentTime + 3600);
+      await deposit.contract.stopDeposits();
       await time.increase(3600);
       await expect(
         deposit.contract.connect(owner).deposit(token1.address, parseEther("1"))
@@ -148,9 +147,7 @@ describe("OmronDeposit", () => {
       );
     });
     it("Should reject deposit when paused", async () => {
-      await expect(deposit.contract.connect(owner).pause())
-        .to.emit(deposit.contract, "Paused")
-        .withArgs(owner.address);
+      await deposit.contract.connect(owner).pause();
 
       await expect(
         deposit.contract.connect(user1).deposit(token1.address, parseEther("1"))
@@ -216,23 +213,6 @@ describe("OmronDeposit", () => {
       expect(balance).to.equal(parseEther("1"));
     });
   });
-  describe("setClaimEnabled", () => {
-    it("Should reject when not owner", async () => {
-      await expect(
-        deposit.contract.connect(user1).setClaimEnabled(true)
-      ).to.be.revertedWithCustomError(
-        deposit.contract,
-        "OwnableUnauthorizedAccount"
-      );
-    });
-    it("Should set claims enabled when owner", async () => {
-      await expect(deposit.contract.connect(owner).setClaimEnabled(true))
-        .to.emit(deposit.contract, "ClaimEnabled")
-        .withArgs(true);
-      const claimEnabled = await deposit.contract.claimEnabled();
-      expect(claimEnabled).to.equal(true);
-    });
-  });
   describe("setClaimManager", () => {
     it("Should set claim manager when owner", async () => {
       await expect(
@@ -241,42 +221,7 @@ describe("OmronDeposit", () => {
         .to.emit(deposit.contract, "ClaimManagerSet")
         .withArgs(user2.address);
     });
-    it("Should add max allowance to the claim manager for all whitelisted tokens", async () => {
-      await deposit.contract.connect(owner).setClaimManager(user2.address);
-      for (const token of erc20Deployments) {
-        expect(await token.contract.allowance(deposit.address, user2)).to.equal(
-          MaxUint256
-        );
-      }
-    });
-    it("Should reset allowance for previous claim manager to zero before setting allowance for new claim manager", async () => {
-      await deposit.contract.connect(owner).setClaimManager(user2.address);
-      for (const token of erc20Deployments) {
-        expect(await token.contract.allowance(deposit.address, user2)).to.equal(
-          MaxUint256
-        );
-      }
-      await deposit.contract.connect(owner).setClaimManager(user1.address);
-      for (const token of erc20Deployments) {
-        expect(await token.contract.allowance(deposit.address, user2)).to.equal(
-          0
-        );
-        expect(
-          await token1.contract.allowance(deposit.address, user1)
-        ).to.equal(MaxUint256);
-      }
-    });
-    it("Should revert if any allowance can not be set", async () => {
-      await deposit.contract.addWhitelistedToken(brokenERC20.address);
-      await brokenERC20.contract.setApprovalRejectAmount(MaxUint256);
-      await expect(
-        deposit.contract.connect(owner).setClaimManager(user1.address)
-      ).to.be.revertedWithCustomError(deposit.contract, "ApprovalFailed");
-      await brokenERC20.contract.setApprovalRejectAmount(0);
-      await expect(
-        deposit.contract.connect(owner).setClaimManager(user1.address)
-      ).to.not.be.revertedWithCustomError(deposit.contract, "ApprovalFailed");
-    });
+
     it("Should not set claim manager provided zero address", async () => {
       await expect(
         deposit.contract.connect(owner).setClaimManager(ZeroAddress)
@@ -293,52 +238,103 @@ describe("OmronDeposit", () => {
   });
 
   describe("setDepositStopTime", () => {
+    it("Should only allow owner to set deposit stop time", async () => {
+      await expect(
+        deposit.contract.connect(user1).stopDeposits()
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "OwnableUnauthorizedAccount"
+      );
+    });
     it("Should prevent setting a new deposit stop time once one is selected", async () => {
       const currentTime = await time.latest();
-      await deposit.contract.setDepositStopTime(currentTime + 3605);
+      await deposit.contract.stopDeposits();
       await expect(
-        deposit.contract.connect(owner).setDepositStopTime(currentTime + 3605)
+        deposit.contract.connect(owner).stopDeposits()
       ).to.be.revertedWithCustomError(
         deposit.contract,
         "DepositStopTimeAlreadySet"
       );
     });
-    it("Should prevent setting a new deposit stop time before the current time", async () => {
-      const currentTime = await time.latest();
+  });
+
+  describe("withdrawTokens", () => {
+    it("Should accept valid token withdrawal", async () => {
+      await deposit.contract.setClaimManager(user1.address);
+
+      await token1.contract.transfer(user2.address, parseEther("1"));
+      await token2.contract.transfer(user2.address, parseEther("1"));
+      await addAllowance(token1, user2, deposit, parseEther("1"));
+      await addAllowance(token2, user2, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user2);
+      await depositTokens(deposit, token2, parseEther("1"), user2);
+
+      await time.increase(3602);
+      await deposit.contract.stopDeposits();
       await expect(
-        deposit.contract.connect(owner).setDepositStopTime(currentTime - 1)
+        deposit.contract.connect(user1).withdrawTokens(user2.address)
+      )
+        .to.emit(deposit.contract, "WithdrawTokens")
+        .withArgs(
+          user2.address,
+          erc20Deployments.map((token) =>
+            [token1.address, token2.address].includes(token.address)
+              ? parseEther("1")
+              : parseEther("0")
+          )
+        );
+      const newDepositBalances = await Promise.all([
+        deposit.contract.tokenBalance(user1.address, token1.address),
+        deposit.contract.tokenBalance(user1.address, token2.address),
+      ]);
+      expect(newDepositBalances).to.eql([parseEther("0"), parseEther("0")]);
+    });
+    it("Should reject when not called from claim manager", async () => {
+      await deposit.contract.setClaimManager(user2.address);
+      await expect(
+        deposit.contract.connect(user1).withdrawTokens(user1.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "NotClaimManager");
+    });
+    it("Should reject when called before deposit stop time", async () => {
+      await deposit.contract.setClaimManager(user1.address);
+      await expect(
+        deposit.contract.connect(user1).withdrawTokens(user1.address)
       ).to.be.revertedWithCustomError(
         deposit.contract,
-        "DepositStopCannotBeRetroactive"
+        "DepositStopTimeNotPassed"
       );
     });
+    it("Should reject withdrawal when contract paused", async () => {
+      await deposit.contract.pause();
+      await expect(
+        deposit.contract.connect(user1).withdrawTokens(user1.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
+    });
   });
+
   describe("claim", () => {
     it("Should correctly claim using mock claim contract", async () => {
       const mockClaimContract = await deployMockClaimContractFixture(
         deposit.address
       );
       await deposit.contract.setClaimManager(mockClaimContract.address);
-      await deposit.contract.setClaimEnabled(true);
       await token1.contract.transfer(user2.address, parseEther("1"));
       await addAllowance(token1, user2, deposit, parseEther("2"));
       await depositTokens(deposit, token1, parseEther("1"), user2);
-      await deposit.contract.setDepositStopTime((await time.latest()) + 3600);
-      await time.increase(3600);
+      await time.increase(3599);
+      await deposit.contract.stopDeposits();
       await expect(mockClaimContract.contract.claimPoints(user2.address))
         .to.emit(mockClaimContract.contract, "PointsClaimed")
         .withArgs(user2.address, parseEther("1"));
     });
     it("Should accept claim and reduce user's point balance to zero", async () => {
-      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
-      const currentTime = await time.latest();
-      await deposit.contract.setDepositStopTime(currentTime + 3605);
       await token1.contract.transfer(user2.address, parseEther("2"));
       await addAllowance(token1, user2, deposit, parseEther("2"));
       await depositTokens(deposit, token1, parseEther("1"), user2);
       await time.increase(3599);
       await depositTokens(deposit, token1, parseEther("1"), user2);
+      await deposit.contract.stopDeposits();
       const initialInfo = await deposit.contract.getUserInfo(user2.address);
       expect(initialInfo.pointBalance).to.equal(parseEther("1"));
       await deposit.contract.connect(user1).claim(user2.address);
@@ -346,7 +342,6 @@ describe("OmronDeposit", () => {
       expect(info.pointBalance).to.equal(parseEther("0"));
     });
     it("Should correctly handle point accrual and claim process", async () => {
-      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
 
       // Transfer and allow tokens for deposit
@@ -354,21 +349,16 @@ describe("OmronDeposit", () => {
       await addAllowance(token1, user2, deposit, parseEther("2"));
 
       // Initial deposit
-
       await depositTokens(deposit, token1, parseEther("1"), user2);
-      const currentTime = await time.latest();
       // In two hours, the contract will switch to claim mode
-      const depositStopTime = currentTime + 7201;
-
-      // Set deposit stop time to 2 hours in the future
-      await deposit.contract.setDepositStopTime(depositStopTime);
-
-      // Simulate nearly 2 hours passing
-      await time.increase(depositStopTime - currentTime - 3);
-      const nowTime = await time.latest();
+      await time.increase(7199);
 
       // Make a last-second deposit
       await depositTokens(deposit, token1, parseEther("1"), user2);
+
+      // Stop deposits
+      await deposit.contract.stopDeposits();
+
       const additionalPointsFromLastDeposit = parseEther(
         "0.000555555555555555"
       );
@@ -393,43 +383,41 @@ describe("OmronDeposit", () => {
       expect(postClaimInfo.pointBalance).to.equal(parseEther("0"));
     });
 
-    it("Should reject when claim disabled", async () => {
+    it("Should reject when contract paused", async () => {
       await deposit.contract.setClaimManager(user1.address);
+      await deposit.contract.stopDeposits();
+      await time.increase(1);
+      await deposit.contract.pause();
       await expect(
         deposit.contract.connect(user1).claim(user2.address)
-      ).to.be.revertedWithCustomError(deposit.contract, "ClaimDisabled");
+      ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
     it("Should reject when claim address is null", async () => {
-      await deposit.contract.setClaimEnabled(true);
       const currentTime = await time.latest();
-      await deposit.contract.setDepositStopTime(currentTime + 1);
+      await deposit.contract.stopDeposits();
+      await time.increase(3601);
       await expect(
         deposit.contract.claim(user1.address)
       ).to.be.revertedWithCustomError(deposit.contract, "ClaimManagerNotSet");
     });
     it("Should reject claim for null address", async () => {
-      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user1.address);
       const currentTime = await time.latest();
-      await deposit.contract.setDepositStopTime(currentTime + 1);
+      await deposit.contract.stopDeposits();
       await expect(
         deposit.contract.connect(user1).claim(ZeroAddress)
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
     it("Should reject when not claim address", async () => {
-      await deposit.contract.setClaimEnabled(true);
       await deposit.contract.setClaimManager(user2.address);
       const currentTime = await time.latest();
-      await deposit.contract.setDepositStopTime(currentTime + 1);
+      await deposit.contract.stopDeposits();
       await expect(
         deposit.contract.connect(user1).claim(user2.address)
       ).to.be.revertedWithCustomError(deposit.contract, "NotClaimManager");
     });
-    it("Should reject when before claim time", async () => {
-      await deposit.contract.setClaimEnabled(true);
+    it("Should reject when before deposit stop time", async () => {
       await deposit.contract.setClaimManager(user2.address);
-      const currentTime = await time.latest();
-      await deposit.contract.setDepositStopTime(currentTime + 3600);
       await expect(
         deposit.contract.connect(user2).claim(user2.address)
       ).to.be.revertedWithCustomError(

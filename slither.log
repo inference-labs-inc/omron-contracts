@@ -1,0 +1,71 @@
+'npx hardhat clean' running (wd: ./omron-contracts)
+'npx hardhat clean --global' running (wd: ./omron-contracts)
+'npx hardhat compile --force' running (wd: ./omron-contracts)
+INFO:Detectors:
+OmronDeposit.onlyAfterDepositStopTime() (contracts/OmronDeposit.sol#233-238) uses a dangerous strict equality:
+	- depositStopTime == 0 || block.timestamp < depositStopTime (contracts/OmronDeposit.sol#234)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
+// DEV: This is ok because this will be initialized to zero, and when it is non-zero, we want the other condition to be checked.
+INFO:Detectors:
+Reentrancy in OmronDeposit.withdrawTokens(address) (contracts/OmronDeposit.sol#352-384):
+	External calls:
+	- token.safeTransfer(claimManager,userBalance) (contracts/OmronDeposit.sol#380)
+	State variables written after the call(s):
+	- user.tokenBalances[allWhitelistedTokens[i]] = 0 (contracts/OmronDeposit.sol#377)
+	OmronDeposit.userInfo (contracts/OmronDeposit.sol#43) can be used in cross function reentrancies:
+	- OmronDeposit.calculatePoints(address) (contracts/OmronDeposit.sol#294-303)
+	- OmronDeposit.getUserInfo(address) (contracts/OmronDeposit.sol#260-275)
+	- OmronDeposit.tokenBalance(address,address) (contracts/OmronDeposit.sol#311-317)
+	- OmronDeposit.userInfo (contracts/OmronDeposit.sol#43)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+// DEV: We use the OpenZeppelin nonReentrant modifier to prevent reentrancy
+INFO:Detectors:
+OmronDeposit.stopDeposits() (contracts/OmronDeposit.sol#193-199) uses timestamp for comparisons
+	Dangerous comparisons:
+	- depositStopTime != 0 (contracts/OmronDeposit.sol#194)
+OmronDeposit._updatePoints(OmronDeposit.UserInfo) (contracts/OmronDeposit.sol#434-448) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > depositStopTime && depositStopTime != 0 (contracts/OmronDeposit.sol#439)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+// DEV: Timestamp comparisons are accepted.
+INFO:Detectors:
+Different versions of Solidity are used:
+	- Version used: ['0.8.21', '^0.8.0', '^0.8.20', '^0.8.21']
+	- 0.8.21 (contracts/OmronDeposit.sol#2)
+	- 0.8.21 (contracts/interfaces/IERC20Min.sol#2)
+	- 0.8.21 (contracts/interfaces/IOmronDeposit.sol#2)
+	- ^0.8.0 (contracts/interfaces/IClaimManager.sol#3)
+	- ^0.8.0 (contracts/mock/FuzzTest.sol#2)
+	- ^0.8.0 (contracts/mock/MockClaim.sol#3)
+	- ^0.8.0 (contracts/mock/ReentrancyAttack.sol#2)
+	- ^0.8.0 (contracts/mock/tstETH.sol#2)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol#3)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Address.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Pausable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol#4)
+	- ^0.8.21 (contracts/mock/brokenERC20.sol#2)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#different-pragma-directives-are-used
+INFO:Detectors:
+Pragma version0.8.21 (contracts/OmronDeposit.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+solc-0.8.21 is not recommended for deployment
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity
+INFO:Detectors:
+Parameter OmronDeposit.addWhitelistedToken(address)._tokenAddress (contracts/OmronDeposit.sol#159) is not in mixedCase
+Parameter OmronDeposit.setClaimManager(address)._newClaimManager (contracts/OmronDeposit.sol#172) is not in mixedCase
+Parameter OmronDeposit.getUserInfo(address)._userAddress (contracts/OmronDeposit.sol#261) is not in mixedCase
+Parameter OmronDeposit.calculatePoints(address)._userAddress (contracts/OmronDeposit.sol#295) is not in mixedCase
+Parameter OmronDeposit.tokenBalance(address,address)._userAddress (contracts/OmronDeposit.sol#312) is not in mixedCase
+Parameter OmronDeposit.tokenBalance(address,address)._tokenAddress (contracts/OmronDeposit.sol#313) is not in mixedCase
+Parameter OmronDeposit.deposit(address,uint256)._tokenAddress (contracts/OmronDeposit.sol#327) is not in mixedCase
+Parameter OmronDeposit.deposit(address,uint256)._amount (contracts/OmronDeposit.sol#328) is not in mixedCase
+Parameter OmronDeposit.withdrawTokens(address)._userAddress (contracts/OmronDeposit.sol#353) is not in mixedCase
+Parameter OmronDeposit.claim(address)._userAddress (contracts/OmronDeposit.sol#392) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+INFO:Slither:. analyzed (23 contracts with 94 detectors), 17 result(s) found
