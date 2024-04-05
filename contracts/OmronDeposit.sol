@@ -67,15 +67,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     // Custom Errors
     error ZeroAddress();
     error TokenNotWhitelisted();
-    error ClaimDisabled();
     error ZeroAmount();
     error NotClaimManager();
     error ClaimManagerNotSet();
-    error DepositStopCannotBeRetroactive();
-    error DepositStopTimeAlreadySet();
-    error DepositStopTimeNotPassed();
-    error DepositStopTimePassed();
-    error ApprovalFailed();
+    error DepositsAlreadyStopped();
+    error DepositsNotStopped();
+    error DepositsStopped();
 
     // Events
 
@@ -192,7 +189,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      */
     function stopDeposits() external onlyOwner {
         if (depositStopTime != 0) {
-            revert DepositStopTimeAlreadySet();
+            revert DepositsAlreadyStopped();
         }
         depositStopTime = block.timestamp;
         emit DepositStopTimeSet(block.timestamp);
@@ -230,9 +227,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev A modifier that checks whether the current time is after the deposit stop time.
      */
-    modifier onlyAfterDepositStopTime() {
-        if (depositStopTime == 0 || block.timestamp < depositStopTime) {
-            revert DepositStopTimeNotPassed();
+    modifier onlyAfterDepositStop() {
+        if (depositStopTime == 0) {
+            revert DepositsNotStopped();
         }
         _;
     }
@@ -241,9 +238,9 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @dev A modifier that checkes whether the current time is before the deposit stop time.
      * Will proceed to execution if deposit stop time isn't set, or if it is set to a date after the current time.
      */
-    modifier onlyBeforeDepositStopTime() {
-        if (depositStopTime != 0 && block.timestamp >= depositStopTime) {
-            revert DepositStopTimePassed();
+    modifier onlyBeforeDepositStop() {
+        if (depositStopTime != 0) {
+            revert DepositsStopped();
         }
         _;
     }
@@ -326,7 +323,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
     function deposit(
         address _tokenAddress,
         uint256 _amount
-    ) external nonReentrant whenNotPaused onlyBeforeDepositStopTime {
+    ) external nonReentrant whenNotPaused onlyBeforeDepositStop {
         if (_amount == 0) {
             revert ZeroAmount();
         }
@@ -362,7 +359,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         nonReentrant
         whenNotPaused
         onlyClaimManager
-        onlyAfterDepositStopTime
+        onlyAfterDepositStop
         returns (uint256[] memory withdrawnAmounts)
     {
         UserInfo storage user = userInfo[_userAddress];
@@ -402,7 +399,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         nonReentrant
         whenNotPaused
         onlyClaimManager
-        onlyAfterDepositStopTime
+        onlyAfterDepositStop
         returns (uint256 pointsClaimed)
     {
         if (_userAddress == address(0)) {

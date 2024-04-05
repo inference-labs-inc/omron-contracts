@@ -141,10 +141,7 @@ describe("OmronDeposit", () => {
       await time.increase(3600);
       await expect(
         deposit.contract.connect(owner).deposit(token1.address, parseEther("1"))
-      ).to.be.revertedWithCustomError(
-        deposit.contract,
-        "DepositStopTimePassed"
-      );
+      ).to.be.revertedWithCustomError(deposit.contract, "DepositsStopped");
     });
     it("Should reject deposit when paused", async () => {
       await deposit.contract.connect(owner).pause();
@@ -237,8 +234,8 @@ describe("OmronDeposit", () => {
     });
   });
 
-  describe("setDepositStopTime", () => {
-    it("Should only allow owner to set deposit stop time", async () => {
+  describe("stopDeposits", () => {
+    it("Should only allow owner to stop deposits", async () => {
       await expect(
         deposit.contract.connect(user1).stopDeposits()
       ).to.be.revertedWithCustomError(
@@ -246,14 +243,13 @@ describe("OmronDeposit", () => {
         "OwnableUnauthorizedAccount"
       );
     });
-    it("Should prevent setting a new deposit stop time once one is selected", async () => {
-      const currentTime = await time.latest();
+    it("Should prevent stopping deposits once they're already stopped", async () => {
       await deposit.contract.stopDeposits();
       await expect(
         deposit.contract.connect(owner).stopDeposits()
       ).to.be.revertedWithCustomError(
         deposit.contract,
-        "DepositStopTimeAlreadySet"
+        "DepositsAlreadyStopped"
       );
     });
   });
@@ -302,10 +298,7 @@ describe("OmronDeposit", () => {
       await deposit.contract.setClaimManager(user1.address);
       await expect(
         deposit.contract.connect(user1).withdrawTokens(user1.address)
-      ).to.be.revertedWithCustomError(
-        deposit.contract,
-        "DepositStopTimeNotPassed"
-      );
+      ).to.be.revertedWithCustomError(deposit.contract, "DepositsNotStopped");
     });
     it("Should reject withdrawal when contract paused", async () => {
       await deposit.contract.pause();
@@ -423,10 +416,7 @@ describe("OmronDeposit", () => {
       await deposit.contract.setClaimManager(user2.address);
       await expect(
         deposit.contract.connect(user2).claim(user2.address)
-      ).to.be.revertedWithCustomError(
-        deposit.contract,
-        "DepositStopTimeNotPassed"
-      );
+      ).to.be.revertedWithCustomError(deposit.contract, "DepositsNotStopped");
     });
   });
   describe("addWhitelistedToken", () => {
