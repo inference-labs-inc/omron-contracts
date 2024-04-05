@@ -460,6 +460,64 @@ describe("OmronDeposit", () => {
     });
   });
   describe("calculatePoints and pointBalance", () => {
+    it("Should keep points consistent between withdrawal and claim", async () => {
+      let calculatedPoints = await deposit.contract.calculatePoints(
+        user1.address
+      );
+      expect(calculatedPoints).to.equal(parseEther("0"));
+      let userInfo = await deposit.contract.getUserInfo(user1.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user1);
+      await time.increase(3599);
+      await deposit.contract.stopDeposits();
+      await deposit.contract.setClaimManager(owner.address);
+      await time.increase(3600);
+      calculatedPoints = await deposit.contract.calculatePoints(user1.address);
+      expect(calculatedPoints).to.equal(parseEther("1"));
+      userInfo = await deposit.contract.getUserInfo(user1.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+      await deposit.contract.withdrawTokens(user1.address);
+      await time.increase(3600);
+      calculatedPoints = await deposit.contract.calculatePoints(user1.address);
+      expect(calculatedPoints).to.equal(parseEther("1"));
+      userInfo = await deposit.contract.getUserInfo(user1.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("1"));
+      await deposit.contract.claim(user1.address);
+      await time.increase(3600);
+      calculatedPoints = await deposit.contract.calculatePoints(user1.address);
+      expect(calculatedPoints).to.equal(parseEther("0"));
+      userInfo = await deposit.contract.getUserInfo(user1.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+    });
+    it("Should keep points consistent between withdrawal and claim (backwards) ", async () => {
+      let calculatedPoints = await deposit.contract.calculatePoints(
+        user1.address
+      );
+      expect(calculatedPoints).to.equal(parseEther("0"));
+      let userInfo = await deposit.contract.getUserInfo(user1.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user1);
+      await time.increase(3599);
+      await deposit.contract.stopDeposits();
+      await deposit.contract.setClaimManager(owner.address);
+      await time.increase(3600);
+      await deposit.contract.claim(user1.address);
+      await time.increase(3600);
+      calculatedPoints = await deposit.contract.calculatePoints(user1.address);
+      expect(calculatedPoints).to.equal(parseEther("0"));
+      userInfo = await deposit.contract.getUserInfo(user1.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+      await deposit.contract.withdrawTokens(user1.address);
+      await time.increase(3600);
+      calculatedPoints = await deposit.contract.calculatePoints(user1.address);
+      expect(calculatedPoints).to.equal(parseEther("0"));
+      userInfo = await deposit.contract.getUserInfo(user1.address);
+      expect(userInfo.pointBalance).to.equal(parseEther("0"));
+    });
     it("Should correctly calculate points after deposit stop", async () => {
       let calculatedPoints = await deposit.contract.calculatePoints(
         owner.address
