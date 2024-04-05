@@ -369,7 +369,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
 
     // Internal View Methods
 
-
     /**
      * @notice Calculate the points earned by a user between their last updated timestamp and the current block timestamp, or the deposit stop time, whichever comes first.
      * @dev Will return zero if a user hasn't deposited, otherwise calculates the number of points earned for the duration between lastUpdated time and block.timestamp or depositStopTime, whichever is first.
@@ -381,7 +380,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
     ) private view returns (uint256 calculatedPoints) {
         // If the user doesn't have this timestamp, then they haven't deposited any tokens, and thus their points are zero.
         if (_user.lastUpdated == 0) {
-            return 0
+            return 0;
         }
 
         uint256 timeElapsed = block.timestamp - _user.lastUpdated;
