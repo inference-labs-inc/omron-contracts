@@ -6,6 +6,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IOmronDeposit} from "./interfaces/IOmronDeposit.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
 
 using SafeERC20 for IERC20;
 
@@ -223,6 +224,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
     ) external view returns (uint256 currentPointsBalance) {
         UserInfo storage user = userInfo[_userAddress];
         currentPointsBalance = user.pointBalance + _calculatePoints(user);
+        console.log(user.pointBalance, _calculatePoints(user));
     }
 
     /**
@@ -289,6 +291,8 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
         returns (uint256[] memory withdrawnAmounts)
     {
         UserInfo storage user = userInfo[_userAddress];
+        _updatePoints(user);
+
         withdrawnAmounts = new uint256[](allWhitelistedTokens.length);
 
         for (uint256 i; i < allWhitelistedTokens.length; ) {

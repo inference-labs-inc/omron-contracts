@@ -490,8 +490,34 @@ describe("OmronDeposit", () => {
       await deposit.contract.claim(owner.address);
       await time.increase(3600);
       calculatedPoints = await deposit.contract.calculatePoints(owner.address);
-      // Since deposit stop is in effect, points should only be calculated until depositStop (1 hour = 1 point)
+      // Points should reset to zero now that they have been claimed
       expect(calculatedPoints).to.equal(parseEther("0"));
+    });
+    it("Should correctly calculate points for a user that has never deposited", async () => {
+      let calculatedPoints = await deposit.contract.calculatePoints(
+        user1.address
+      );
+      expect(calculatedPoints).to.equal(parseEther("0"));
+    });
+    it("Should correctly calculate points after deposit stop and withdrawal", async () => {
+      let calculatedPoints = await deposit.contract.calculatePoints(
+        user1.address
+      );
+      expect(calculatedPoints).to.equal(parseEther("0"));
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user1);
+      await time.increase(3599);
+      await deposit.contract.stopDeposits();
+      await deposit.contract.setClaimManager(owner.address);
+      calculatedPoints = await deposit.contract.calculatePoints(user1.address);
+      // Since deposit stop is in effect, points should only be calculated until depositStop (1 hour = 1 point)
+      expect(calculatedPoints).to.equal(parseEther("1"));
+      await deposit.contract.withdrawTokens(user1.address);
+      await time.increase(3600);
+      calculatedPoints = await deposit.contract.calculatePoints(user1.address);
+      // Points should still be 1 since they haven't yet been claimed
+      expect(calculatedPoints).to.equal(parseEther("1"));
     });
     it("Should correctly increase balance for ERC20 deposit", async () => {
       let info = await deposit.contract.getUserInfo(owner);
