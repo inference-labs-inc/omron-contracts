@@ -263,9 +263,10 @@ describe("OmronDeposit", () => {
       await addAllowance(token1, user2, deposit, parseEther("1"));
       await addAllowance(token2, user2, deposit, parseEther("1"));
       await depositTokens(deposit, token1, parseEther("1"), user2);
+      await time.increase(3599);
       await depositTokens(deposit, token2, parseEther("1"), user2);
-
-      await time.increase(3602);
+      await time.increase(3599);
+      // 3 points earned here. txs take 1s each, and the first point is in the contract for 2hr while the second is in there for 1 hr
       await deposit.contract.stopDeposits();
       await expect(
         deposit.contract.connect(user1).withdrawTokens(user2.address)
@@ -280,13 +281,13 @@ describe("OmronDeposit", () => {
           )
         );
       const newDepositBalances = await Promise.all([
-        deposit.contract.tokenBalance(user1.address, token1.address),
-        deposit.contract.tokenBalance(user1.address, token2.address),
+        deposit.contract.tokenBalance(user2.address, token1.address),
+        deposit.contract.tokenBalance(user2.address, token2.address),
       ]);
       expect(newDepositBalances).to.eql([parseEther("0"), parseEther("0")]);
-      expect(
-        (await deposit.contract.getUserInfo(user1.address)).pointsPerHour
-      ).to.eql(parseEther("0"));
+      const userInfo = await deposit.contract.getUserInfo(user2.address);
+      expect(userInfo.pointsPerHour).to.eql(parseEther("0"));
+      expect(userInfo.pointBalance).to.eql(parseEther("3"));
     });
     it("Should reject when not called from claim manager", async () => {
       await deposit.contract.setClaimManager(user2.address);
