@@ -223,6 +223,11 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
     ) external view returns (uint256 currentPointsBalance) {
         UserInfo storage user = userInfo[_userAddress];
         uint256 timeElapsed = block.timestamp - user.lastUpdated;
+        // If the current time is after the depositStopTime and it is non-zero, then use it to determine time elapsed,
+        // since no points are being accrued after deposit stop
+        if (block.timestamp > depositStopTime && depositStopTime != 0) {
+            timeElapsed = depositStopTime - user.lastUpdated;
+        }
         uint256 pointsEarned = (timeElapsed *
             user.pointsPerHour *
             10 ** POINTS_DECIMALS) / (3600 * 10 ** POINTS_DECIMALS);
