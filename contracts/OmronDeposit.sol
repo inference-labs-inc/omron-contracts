@@ -371,7 +371,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
 
     /**
      * @notice Calculate the points earned by a user between their last updated timestamp and the current block timestamp, or the deposit stop time, whichever comes first.
-     * @dev Will return zero if a user hasn't deposited, otherwise calculates the number of points earned for the duration between lastUpdated time and block.timestamp or depositStopTime, whichever is first.
+     * @dev Will return zero if a user hasn't deposited, the user is not earning any points per hour, or the last updated timestamp is later than the deposit stop time as long as it's non-zero.
      * @param _user The user to calculate the points for
      * @return calculatedPoints The number of points earned by the user, since lastUpdated
      */
@@ -379,14 +379,19 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
         UserInfo storage _user
     ) private view returns (uint256 calculatedPoints) {
         // If the user doesn't have this timestamp, then they haven't deposited any tokens, and thus their points are zero.
-        if (_user.lastUpdated == 0) {
+        // Otherwise, if their points per hour are zero, then there are no rewards between their last updated time and the deposit stop or the current time.
+        if (
+            _user.lastUpdated == 0 ||
+            _user.pointsPerHour == 0 ||
+            (_user.lastUpdated >= depositStopTime && depositStopTime != 0)
+        ) {
             return 0;
         }
 
         uint256 timeElapsed = block.timestamp - _user.lastUpdated;
         // If the current time is after the depositStopTime and it is non-zero, then use it to determine time elapsed,
         // since no points are being accrued after deposit stop
-        if (block.timestamp > depositStopTime && depositStopTime != 0) {
+        if (depositStopTime != 0) {
             timeElapsed = depositStopTime - _user.lastUpdated;
         }
         calculatedPoints =
