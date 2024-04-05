@@ -222,16 +222,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
         address _userAddress
     ) external view returns (uint256 currentPointsBalance) {
         UserInfo storage user = userInfo[_userAddress];
-        uint256 timeElapsed = block.timestamp - user.lastUpdated;
-        // If the current time is after the depositStopTime and it is non-zero, then use it to determine time elapsed,
-        // since no points are being accrued after deposit stop
-        if (block.timestamp > depositStopTime && depositStopTime != 0) {
-            timeElapsed = depositStopTime - user.lastUpdated;
-        }
-        uint256 pointsEarned = (timeElapsed *
-            user.pointsPerHour *
-            10 ** POINTS_DECIMALS) / (3600 * 10 ** POINTS_DECIMALS);
-        currentPointsBalance = pointsEarned + user.pointBalance;
+        currentPointsBalance = user.pointBalance + _calculatePoints(user);
     }
 
     /**
@@ -371,17 +362,27 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
      */
     function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
-            uint256 timeElapsed = block.timestamp - _user.lastUpdated;
-            // If the current time is after the depositStopTime and it is non-zero, then use it to determine time elapsed,
-            // since no points are being accrued after deposit stop
-            if (block.timestamp > depositStopTime && depositStopTime != 0) {
-                timeElapsed = depositStopTime - _user.lastUpdated;
-            }
-            uint256 pointsEarned = (timeElapsed *
-                _user.pointsPerHour *
-                10 ** POINTS_DECIMALS) / (3600 * 10 ** POINTS_DECIMALS);
-            _user.pointBalance += pointsEarned;
+            _user.pointBalance += _calculatePoints(_user);
         }
         _user.lastUpdated = block.timestamp;
+    }
+
+    function _calculatePoints(
+        UserInfo storage _user
+    ) private view returns (uint256 calculatedPoints) {
+        // If the user doesn't have this timestamp, then they haven't deposited any tokens, and thus their points are zero.
+        if (_user.lastUpdated == 0) {
+            return 0;
+        }
+
+        uint256 timeElapsed = block.timestamp - _user.lastUpdated;
+        // If the current time is after the depositStopTime and it is non-zero, then use it to determine time elapsed,
+        // since no points are being accrued after deposit stop
+        if (block.timestamp > depositStopTime && depositStopTime != 0) {
+            timeElapsed = depositStopTime - _user.lastUpdated;
+        }
+        calculatedPoints =
+            (timeElapsed * _user.pointsPerHour * 10 ** POINTS_DECIMALS) /
+            (3600 * 10 ** POINTS_DECIMALS);
     }
 }
