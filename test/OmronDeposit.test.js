@@ -288,6 +288,9 @@ describe("OmronDeposit", () => {
         deposit.contract.tokenBalance(user1.address, token2.address),
       ]);
       expect(newDepositBalances).to.eql([parseEther("0"), parseEther("0")]);
+      expect(
+        (await deposit.contract.getUserInfo(user1.address)).pointsPerHour
+      ).to.eql(parseEther("0"));
     });
     it("Should reject when not called from claim manager", async () => {
       await deposit.contract.setClaimManager(user2.address);

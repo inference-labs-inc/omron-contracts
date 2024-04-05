@@ -365,10 +365,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         onlyAfterDepositStopTime
         returns (uint256[] memory withdrawnAmounts)
     {
+        UserInfo storage user = userInfo[_userAddress];
         withdrawnAmounts = new uint256[](allWhitelistedTokens.length);
 
         for (uint256 i; i < allWhitelistedTokens.length; ) {
-            UserInfo storage user = userInfo[_userAddress];
             uint256 userBalance = user.tokenBalances[allWhitelistedTokens[i]];
 
             if (userBalance == 0) {
@@ -385,6 +385,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
             IERC20 token = IERC20(allWhitelistedTokens[i]);
             token.safeTransfer(claimManager, userBalance);
         }
+        user.pointsPerHour = 0;
         emit WithdrawTokens(_userAddress, withdrawnAmounts);
         return withdrawnAmounts;
     }
@@ -428,7 +429,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
         // Return their current point balance, and set it to zero.
         pointsClaimed = _user.pointBalance;
         _user.pointBalance = 0;
-        _user.pointsPerHour = 0;
     }
 
     // Internal functions
