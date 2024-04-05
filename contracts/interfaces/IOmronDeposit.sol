@@ -2,11 +2,11 @@
 pragma solidity 0.8.21;
 
 /**
- * @title OmronDeposit
+ * @title IOmronDeposit
  * @author Inference Labs
  * @custom:security-contact whitehat@inferencelabs.com
- * @notice A contract that allows users to deposit tokens and earn points based on the amount of time the tokens are held in the contract.
- * @dev Users can deposit any token that is accepted by the contract. The contract will track the amount of time the tokens are held in the contract and award points based on the amount of time the tokens are held.
+ * @notice Contract interface for OmronDeposit
+ * @dev This contract is the interface for the OmronDeposit contract.
  */
 interface IOmronDeposit {
     // Structs
