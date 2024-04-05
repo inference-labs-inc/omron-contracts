@@ -2,9 +2,11 @@
 pragma solidity 0.8.21;
 
 /**
- * @title Interface for OmronDeposit Contract
- * @notice This interface outlines the functions and events for the OmronDeposit contract, which allows users to deposit tokens and earn points.
+ * @title OmronDeposit
+ * @author Inference Labs
  * @custom:security-contact whitehat@inferencelabs.com
+ * @notice A contract that allows users to deposit tokens and earn points based on the amount of time the tokens are held in the contract.
+ * @dev Users can deposit any token that is accepted by the contract. The contract will track the amount of time the tokens are held in the contract and award points based on the amount of time the tokens are held.
  */
 interface IOmronDeposit {
     // Structs
@@ -22,15 +24,12 @@ interface IOmronDeposit {
     // Custom Errors
     error ZeroAddress();
     error TokenNotWhitelisted();
-    error ClaimDisabled();
     error ZeroAmount();
     error NotClaimManager();
     error ClaimManagerNotSet();
-    error DepositStopCannotBeRetroactive();
-    error DepositStopTimeAlreadySet();
-    error DepositStopTimeNotPassed();
-    error DepositStopTimePassed();
-    error ApprovalFailed();
+    error DepositsAlreadyStopped();
+    error DepositsNotStopped();
+    error DepositsStopped();
 
     // Events
 
@@ -54,12 +53,6 @@ interface IOmronDeposit {
     event ClaimPoints(address indexed user, uint256 pointsClaimed);
 
     /**
-     * Emitted when the claim enabled state of the contract is changed
-     * @param _enabled The new state of claim enabled
-     */
-    event ClaimEnabled(bool indexed _enabled);
-
-    /**
      * Emitted when a new token is added to the whitelist
      * @param _tokenAddress The address of the token that was added to the whitelist
      */
@@ -71,6 +64,22 @@ interface IOmronDeposit {
      */
     event ClaimManagerSet(address indexed _claimManager);
 
+    /**
+     * Emitted when the deposit stop time is set
+     * @param _depositStopTime The timestamp of the new deposit stop time
+     */
+    event DepositStopTimeSet(uint256 indexed _depositStopTime);
+
+    /**
+     * Emitted when tokens are withdrawn from the contract
+     * @param _userAddress The address of the user that withdrawn the tokens
+     * @param _withdrawnAmounts An array of the amounts of the tokens that were withdrawn
+     */
+    event WithdrawTokens(
+        address indexed _userAddress,
+        uint256[] _withdrawnAmounts
+    );
+
     // Owner only methods
 
     /**
@@ -80,22 +89,23 @@ interface IOmronDeposit {
     function addWhitelistedToken(address _tokenAddress) external;
 
     /**
-     * @dev Set the claim enabled state of the contract
-     * @param _enabled The new state of claim enabled
-     */
-    function setClaimEnabled(bool _enabled) external;
-
-    /**
      * @dev Set the address of the contract which is allowed to claim points on behalf of users. Can be set to the null address to disable claims.
      * @param _newClaimManager The address of the contract which is allowed to claim points on behalf of users.
      */
     function setClaimManager(address _newClaimManager) external;
 
     /**
-     * @dev Set the timestamp of the end of the points accrual period. Points will no longer accrue for any deposits beyond this timestamp.
-     * @param _newDepositStopTime The timestamp of the end of the points accrual period.
+     * @notice Ends the deposit period
+     * @dev This will:
+     * 1. Set the deposit stop time to the current block time
+     * 2. Emit the DepositStopTimeSet event
+     * As a result:
+     * Deposits will no longer be accepted
+     * Claims will be enabled
+     * Withdrawals will be enabled
+     * Points accrual will no longer take place
      */
-    function setDepositStopTime(uint256 _newDepositStopTime) external;
+    function stopDeposits() external;
 
     /**
      * @dev Pause the contract
@@ -164,6 +174,16 @@ interface IOmronDeposit {
      * @param _amount The amount of the token to be deposited
      */
     function deposit(address _tokenAddress, uint256 _amount) external;
+
+    /**
+     * @notice Withdraw tokens from the contract
+     * @dev Called by the claim manager to withdraw tokens on a user's behalf
+     * @param _userAddress The address of the user to withdraw the tokens from
+     * @return withdrawnAmounts An array of the amounts of the tokens that were withdrawn
+     */
+    function withdrawTokens(
+        address _userAddress
+    ) external returns (uint256[] memory withdrawnAmounts);
 
     /**
      * @dev Called by the claim manager to claim all points for the user

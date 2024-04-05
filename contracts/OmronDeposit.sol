@@ -4,7 +4,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
+import {IOmronDeposit} from "./interfaces/IOmronDeposit.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 using SafeERC20 for IERC20;
@@ -16,19 +16,7 @@ using SafeERC20 for IERC20;
  * @notice A contract that allows users to deposit tokens and earn points based on the amount of time the tokens are held in the contract.
  * @dev Users can deposit any token that is accepted by the contract. The contract will track the amount of time the tokens are held in the contract and award points based on the amount of time the tokens are held.
  */
-contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
-    // Structs
-
-    /**
-     * @notice A struct that holds information about a user's points and token balances
-     */
-    struct UserInfo {
-        mapping(address tokenAddress => uint256 balanceAmount) tokenBalances;
-        uint256 pointBalance;
-        uint256 pointsPerHour;
-        uint256 lastUpdated;
-    }
-
+contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
     // Mappings
 
     /**
@@ -63,65 +51,6 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable {
      * @notice The time at which claims become enabled and points no longer accrue for any deposits.
      */
     uint256 public depositStopTime;
-
-    // Custom Errors
-    error ZeroAddress();
-    error TokenNotWhitelisted();
-    error ZeroAmount();
-    error NotClaimManager();
-    error ClaimManagerNotSet();
-    error DepositsAlreadyStopped();
-    error DepositsNotStopped();
-    error DepositsStopped();
-
-    // Events
-
-    /**
-     * Emitted when a user deposits ERC20 tokens into the contract
-     * @param from The address of the user that deposited the tokens
-     * @param tokenAddress The address of the token that was deposited
-     * @param amount The amount of the token that was deposited
-     */
-    event Deposit(
-        address indexed from,
-        address indexed tokenAddress,
-        uint256 amount
-    );
-
-    /**
-     * Emitted when a user claims their points via the claim contract
-     * @param user The address of the user that claimed
-     * @param pointsClaimed The number of points the user claimed
-     */
-    event ClaimPoints(address indexed user, uint256 pointsClaimed);
-
-    /**
-     * Emitted when a new token is added to the whitelist
-     * @param _tokenAddress The address of the token that was added to the whitelist
-     */
-    event WhitelistedTokenAdded(address indexed _tokenAddress);
-
-    /**
-     * Emitted when the claim manager contract is set
-     * @param _claimManager The address of the new claim manager contract
-     */
-    event ClaimManagerSet(address indexed _claimManager);
-
-    /**
-     * Emitted when the deposit stop time is set
-     * @param _depositStopTime The timestamp of the new deposit stop time
-     */
-    event DepositStopTimeSet(uint256 indexed _depositStopTime);
-
-    /**
-     * Emitted when tokens are withdrawn from the contract
-     * @param _userAddress The address of the user that withdrawn the tokens
-     * @param _withdrawnAmounts An array of the amounts of the tokens that were withdrawn
-     */
-    event WithdrawTokens(
-        address indexed _userAddress,
-        uint256[] _withdrawnAmounts
-    );
 
     /**
      * @dev The constructor for the OmronDeposit contract.
