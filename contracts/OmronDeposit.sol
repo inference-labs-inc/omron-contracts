@@ -288,6 +288,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
         onlyAfterDepositStop
         returns (uint256[] memory withdrawnAmounts)
     {
+        if (_userAddress == address(0)) {
+            revert ZeroAddress();
+        }
+
         UserInfo storage user = userInfo[_userAddress];
         _updatePoints(user);
 
@@ -340,27 +344,17 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
 
         UserInfo storage user = userInfo[_userAddress];
 
-        pointsClaimed = _claimPoints(user);
+        _updatePoints(user);
+
+        // Return their current point balance, and set it to zero.
+        pointsClaimed = user.pointBalance;
+
+        user.pointBalance = 0;
 
         emit ClaimPoints(_userAddress, pointsClaimed);
     }
 
-    /**
-     * @dev Claim points from the contract
-     * @param _user The user to claim points for
-     * @return pointsClaimed The number of points claimed by the user
-     */
-    function _claimPoints(
-        UserInfo storage _user
-    ) private returns (uint256 pointsClaimed) {
-        _updatePoints(_user);
-
-        // Return their current point balance, and set it to zero.
-        pointsClaimed = _user.pointBalance;
-        _user.pointBalance = 0;
-    }
-
-    // Internal functions
+    // Private functions
 
     /**
      * @dev Update points information for a user
@@ -373,7 +367,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
         _user.lastUpdated = block.timestamp;
     }
 
-    // Internal View Methods
+    // Private View Methods
 
     /**
      * @notice Calculate the points earned by a user between their last updated timestamp and the current block timestamp, or the deposit stop time, whichever comes first.
@@ -393,10 +387,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
         ) {
             return 0;
         }
-
         uint256 timeElapsed = block.timestamp - _user.lastUpdated;
         // If the current time is after the depositStopTime and it is non-zero, then use it to determine time elapsed,
         // since no points are being accrued after deposit stop
+        // timeElapsed will always be >= 0 due to checks above
         if (depositStopTime != 0) {
             timeElapsed = depositStopTime - _user.lastUpdated;
         }

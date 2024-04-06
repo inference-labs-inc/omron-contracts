@@ -236,12 +236,12 @@ describe("OmronDeposit", () => {
 
   describe("stopDeposits", () => {
     it("Should only allow owner to stop deposits", async () => {
-      await expect(
-        deposit.contract.connect(user1).stopDeposits()
-      ).to.be.revertedWithCustomError(
-        deposit.contract,
-        "OwnableUnauthorizedAccount"
-      );
+      await expect(deposit.contract.connect(user1).stopDeposits())
+        .to.be.revertedWithCustomError(
+          deposit.contract,
+          "OwnableUnauthorizedAccount"
+        )
+        .withArgs(user1.address);
     });
     it("Should prevent stopping deposits once they're already stopped", async () => {
       await deposit.contract.stopDeposits();
@@ -376,6 +376,13 @@ describe("OmronDeposit", () => {
         deposit.contract.connect(user1).withdrawTokens(user1.address)
       ).to.be.revertedWithCustomError(deposit.contract, "EnforcedPause");
     });
+    it("Should reject withdrawal for null address", async () => {
+      await deposit.contract.setClaimManager(user1.address);
+      await deposit.contract.stopDeposits();
+      await expect(
+        deposit.contract.connect(user1).withdrawTokens(ZeroAddress)
+      ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
+    });
   });
 
   describe("claim", () => {
@@ -407,6 +414,21 @@ describe("OmronDeposit", () => {
       const info = await deposit.contract.getUserInfo(user2.address);
       expect(info.pointBalance).to.equal(parseEther("0"));
     });
+    it("Should return no points on double claim", async () => {
+      await deposit.contract.setClaimManager(user2.address);
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user1);
+      await time.increase(3599);
+      await deposit.contract.stopDeposits();
+      await expect(deposit.contract.connect(user2).claim(user1.address))
+        .to.emit(deposit.contract, "ClaimPoints")
+        .withArgs(user1.address, parseEther("1"));
+      await expect(deposit.contract.connect(user2).claim(user1.address))
+        .to.emit(deposit.contract, "ClaimPoints")
+        .withArgs(user1.address, parseEther("0"));
+    });
+
     it("Should correctly handle point accrual and claim process", async () => {
       await deposit.contract.setClaimManager(user1.address);
 
