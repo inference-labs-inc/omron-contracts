@@ -385,6 +385,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
     ) private view returns (uint256 calculatedPoints) {
         // If the user doesn't have this timestamp, then they haven't deposited any tokens, and thus their points are zero.
         // Otherwise, if their points per hour are zero, then there are no rewards between their last updated time and the deposit stop or the current time.
+        // Finally, if the deposit stop time is non-zero and the last updated time is after the deposit stop time, then the user is not earning points.
         if (
             _user.lastUpdated == 0 ||
             _user.pointsPerHour == 0 ||
