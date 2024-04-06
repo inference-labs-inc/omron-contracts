@@ -17,7 +17,7 @@ contract OmronDepositTest is OmronDeposit {
     constructor() OmronDeposit(msg.sender, new address[](0)) {}
 
     function echidna_points_decimals_18() public returns (bool) {
-        return (POINTS_DECIMALS == 18);
+        return (POINTS_SCALE == 10 ** 18);
     }
 
     function echidna_test_whitelisted_tokens() public returns (bool) {

@@ -35,7 +35,12 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
     /**
      * @notice The number of decimal places for points
      */
-    uint8 public constant POINTS_DECIMALS = 18;
+    uint256 public constant POINTS_SCALE = 10 ** 18;
+
+    /**
+     * @notice One hour, in seconds, scaled to points decimals
+     */
+    uint256 public constant ONE_HOUR_IN_POINTS = 3600 * POINTS_SCALE;
 
     /**
      * @notice An array of addresses of all whitelisted tokens
@@ -395,7 +400,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
             timeElapsed = depositStopTime - _user.lastUpdated;
         }
         calculatedPoints =
-            (timeElapsed * _user.pointsPerHour * 10 ** POINTS_DECIMALS) /
-            (3600 * 10 ** POINTS_DECIMALS);
+            (timeElapsed * _user.pointsPerHour * POINTS_SCALE) /
+            ONE_HOUR_IN_POINTS;
     }
 }
