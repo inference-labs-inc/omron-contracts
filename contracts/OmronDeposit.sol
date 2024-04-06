@@ -309,6 +309,10 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
 
             IERC20 token = IERC20(allWhitelistedTokens[i]);
             token.safeTransfer(claimManager, userBalance);
+
+            unchecked {
+                ++i;
+            }
         }
         user.pointsPerHour = 0;
         emit WithdrawTokens(_userAddress, withdrawnAmounts);

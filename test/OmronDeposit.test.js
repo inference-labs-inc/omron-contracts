@@ -289,6 +289,31 @@ describe("OmronDeposit", () => {
       expect(userInfo.pointsPerHour).to.eql(parseEther("0"));
       expect(userInfo.pointBalance).to.eql(parseEther("3"));
     });
+    it("Should withdraw when all tokens have a balance", async () => {
+      await deposit.contract.setClaimManager(user2.address);
+      for (const token of erc20Deployments) {
+        await token.contract.transfer(user1.address, parseEther("1"));
+        await addAllowance(token, user1, deposit, parseEther("1"));
+        await depositTokens(deposit, token, parseEther("1"), user1);
+      }
+      await deposit.contract.stopDeposits();
+      await expect(
+        deposit.contract.connect(user2).withdrawTokens(user1.address)
+      )
+        .to.emit(deposit.contract, "WithdrawTokens")
+        .withArgs(
+          user1.address,
+          erc20Deployments.map((token) => parseEther("1"))
+        );
+      const newClaimBalances = await Promise.all(
+        erc20Deployments.map(
+          async (token) => await token.contract.balanceOf(user2.address)
+        )
+      );
+      expect(newClaimBalances).to.eql(
+        erc20Deployments.map((token) => parseEther("1"))
+      );
+    });
     it("Should not transfer any tokens on double withdraw", async () => {
       let originalBalances = await Promise.all(
         erc20Deployments.map(
