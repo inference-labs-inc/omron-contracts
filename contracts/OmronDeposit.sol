@@ -227,7 +227,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
         address _userAddress
     ) external view returns (uint256 currentPointsBalance) {
         UserInfo storage user = userInfo[_userAddress];
-        currentPointsBalance = user.pointBalance + _calculatePoints(user);
+        currentPointsBalance = user.pointBalance + _calculatePointsDiff(user);
     }
 
     /**
@@ -367,7 +367,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
      */
     function _updatePoints(UserInfo storage _user) private {
         if (_user.lastUpdated != 0) {
-            _user.pointBalance += _calculatePoints(_user);
+            _user.pointBalance += _calculatePointsDiff(_user);
         }
         _user.lastUpdated = block.timestamp;
     }
@@ -380,7 +380,7 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
      * @param _user The user to calculate the points for
      * @return calculatedPoints The number of points earned by the user, since lastUpdated
      */
-    function _calculatePoints(
+    function _calculatePointsDiff(
         UserInfo storage _user
     ) private view returns (uint256 calculatedPoints) {
         // If the user doesn't have this timestamp, then they haven't deposited any tokens, and thus their points are zero.
