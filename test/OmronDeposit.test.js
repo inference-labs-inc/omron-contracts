@@ -384,7 +384,115 @@ describe("OmronDeposit", () => {
       ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
     });
   });
-
+  describe("removeWhitelistedToken", async () => {
+    it("Should remove a token from the whitelist", async () => {
+      const originalLength = (await deposit.contract.getAllWhitelistedTokens())
+        .length;
+      await expect(deposit.contract.removeWhitelistedToken(token1.address))
+        .to.emit(deposit.contract, "WhitelistedTokenRemoved")
+        .withArgs(token1.address);
+      const newLength = (await deposit.contract.getAllWhitelistedTokens())
+        .length;
+      expect(newLength).to.equal(originalLength - 1);
+      expect(await deposit.contract.getAllWhitelistedTokens()).to.not.include(
+        token1.address
+      );
+    });
+    it("Should not allow removal of the null address", async () => {
+      await expect(
+        deposit.contract.removeWhitelistedToken(ZeroAddress)
+      ).to.be.revertedWithCustomError(deposit.contract, "ZeroAddress");
+    });
+    it("Should not allow removal of a token that is not whitelisted", async () => {
+      await expect(
+        deposit.contract.removeWhitelistedToken(nonWhitelistedToken.address)
+      ).to.be.revertedWithCustomError(deposit.contract, "TokenNotWhitelisted");
+    });
+    it("Should cease allowing deposits of a token that is no longer whitelisted", async () => {
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user1);
+      await deposit.contract.removeWhitelistedToken(token1.address);
+      await expect(
+        deposit.contract.deposit(token1.address, parseEther("1"))
+      ).to.be.revertedWithCustomError(deposit.contract, "TokenNotWhitelisted");
+    });
+    it("Should not do withdrawals of a token that is no longer whitelisted", async () => {
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user1);
+      await deposit.contract.setClaimManager(owner.address);
+      await deposit.contract.stopDeposits();
+      await deposit.contract.removeWhitelistedToken(token1.address);
+      await deposit.contract.withdrawTokens(user1.address);
+      expect(await token1.contract.balanceOf(user1.address)).to.equal(
+        parseEther("0")
+      );
+    });
+    it("Should allow withdraw if a whitelisted token is re-added", async () => {
+      await token1.contract.transfer(user1.address, parseEther("1"));
+      await addAllowance(token1, user1, deposit, parseEther("1"));
+      await depositTokens(deposit, token1, parseEther("1"), user1);
+      await deposit.contract.setClaimManager(user2.address);
+      await deposit.contract.stopDeposits();
+      await expect(deposit.contract.removeWhitelistedToken(token1.address))
+        .to.emit(deposit.contract, "WhitelistedTokenRemoved")
+        .withArgs(token1.address);
+      expect(await deposit.contract.getAllWhitelistedTokens()).to.not.include(
+        token1.address
+      );
+      await expect(
+        deposit.contract.connect(user2).withdrawTokens(user1.address)
+      )
+        .to.emit(deposit.contract, "WithdrawTokens")
+        .withArgs(user1.address, [
+          parseEther("0"),
+          parseEther("0"),
+          parseEther("0"),
+          parseEther("0"),
+        ]);
+      expect(await token1.contract.balanceOf(user1.address)).to.equal(
+        parseEther("0")
+      );
+      await expect(deposit.contract.addWhitelistedToken(token1.address))
+        .to.emit(deposit.contract, "WhitelistedTokenAdded")
+        .withArgs(token1.address);
+      await expect(
+        deposit.contract.connect(user2).withdrawTokens(user1.address)
+      )
+        .to.emit(deposit.contract, "WithdrawTokens")
+        .withArgs(user1.address, [
+          parseEther("0"),
+          parseEther("0"),
+          parseEther("0"),
+          parseEther("0"),
+          parseEther("1"),
+        ]);
+      expect(await token1.contract.balanceOf(user2.address)).to.equal(
+        parseEther("1")
+      );
+    });
+    it("Should allow cycles of addition and removal for the same token", async () => {
+      await expect(deposit.contract.removeWhitelistedToken(token1.address))
+        .to.emit(deposit.contract, "WhitelistedTokenRemoved")
+        .withArgs(token1.address);
+      expect(await deposit.contract.getAllWhitelistedTokens()).to.not.include(
+        token1.address
+      );
+      await expect(deposit.contract.addWhitelistedToken(token1.address))
+        .to.emit(deposit.contract, "WhitelistedTokenAdded")
+        .withArgs(token1.address);
+      expect(await deposit.contract.getAllWhitelistedTokens()).to.include(
+        token1.address
+      );
+      await expect(deposit.contract.removeWhitelistedToken(token1.address))
+        .to.emit(deposit.contract, "WhitelistedTokenRemoved")
+        .withArgs(token1.address);
+      expect(await deposit.contract.getAllWhitelistedTokens()).to.not.include(
+        token1.address
+      );
+    });
+  });
   describe("claim", () => {
     it("Should correctly claim using mock claim contract", async () => {
       const mockClaimContract = await deployMockClaimContractFixture(

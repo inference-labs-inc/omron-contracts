@@ -97,6 +97,42 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
     }
 
     /**
+     * @dev Remove a token from the whitelist
+     * @param _tokenAddress The address of the token to be removed
+     */
+    function removeWhitelistedToken(address _tokenAddress) external onlyOwner {
+        if (_tokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        whitelistedTokens[_tokenAddress] = false;
+        bool found = false;
+        for (uint256 i; i < allWhitelistedTokens.length; ) {
+            // Check if the current token address is the token to be removed
+            if (allWhitelistedTokens[i] == _tokenAddress) {
+                found = true;
+                // If the token address is the last element, we can call pop
+                if (i == allWhitelistedTokens.length - 1) {
+                    allWhitelistedTokens.pop();
+                } else {
+                    // If the token address is not at the end of the array, replace the value with the address at the end of the array and then pop to remove the duplicate
+                    allWhitelistedTokens[i] = allWhitelistedTokens[
+                        allWhitelistedTokens.length - 1
+                    ];
+                    allWhitelistedTokens.pop();
+                }
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        if (!found) {
+            revert TokenNotWhitelisted();
+        }
+        emit WhitelistedTokenRemoved(_tokenAddress);
+    }
+
+    /**
      * @dev Set the address of the contract which is allowed to claim points on behalf of users. Can be set to the null address to disable claims.
      * @param _newClaimManager The address of the contract which is allowed to claim points on behalf of users.
      */

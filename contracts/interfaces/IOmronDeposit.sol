@@ -59,6 +59,12 @@ interface IOmronDeposit {
     event WhitelistedTokenAdded(address indexed _tokenAddress);
 
     /**
+     * Emitted when a token is removed from the whitelist
+     * @param _tokenAddress The address of the token that was removed from the whitelist
+     */
+    event WhitelistedTokenRemoved(address indexed _tokenAddress);
+
+    /**
      * Emitted when the claim manager contract is set
      * @param _claimManager The address of the new claim manager contract
      */
