@@ -55,9 +55,7 @@ Different versions of Solidity are used:
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#different-pragma-directives-are-used
 INFO:Detectors:
 OmronDeposit.removeWhitelistedToken(address) (contracts/OmronDeposit.sol#103-133) has costly operations inside a loop:
-	- allWhitelistedTokens.pop() (contracts/OmronDeposit.sol#115)
-OmronDeposit.removeWhitelistedToken(address) (contracts/OmronDeposit.sol#103-133) has costly operations inside a loop:
-	- allWhitelistedTokens.pop() (contracts/OmronDeposit.sol#121)
+	- allWhitelistedTokens.pop() (contracts/OmronDeposit.sol#122)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#costly-operations-inside-a-loop
 INFO:Detectors:
 Pragma version0.8.21 (contracts/OmronDeposit.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
@@ -77,4 +75,4 @@ Parameter OmronDeposit.deposit(address,uint256)._amount (contracts/OmronDeposit.
 Parameter OmronDeposit.withdrawTokens(address)._userAddress (contracts/OmronDeposit.sol#323) is not in mixedCase
 Parameter OmronDeposit.claim(address)._userAddress (contracts/OmronDeposit.sol#373) is not in mixedCase
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
-INFO:Slither:. analyzed (23 contracts with 94 detectors), 21 result(s) found
+INFO:Slither:. analyzed (23 contracts with 94 detectors), 20 result(s) found

@@ -110,16 +110,16 @@ contract OmronDeposit is Ownable, ReentrancyGuard, Pausable, IOmronDeposit {
             // Check if the current token address is the token to be removed
             if (allWhitelistedTokens[i] == _tokenAddress) {
                 found = true;
-                // If the token address is the last element, we can call pop
-                if (i == allWhitelistedTokens.length - 1) {
-                    allWhitelistedTokens.pop();
-                } else {
-                    // If the token address is not at the end of the array, replace the value with the address at the end of the array and then pop to remove the duplicate
+                // If the token is not already at the end of the array, then copy the token address from the last position into the i position
+                if (i != allWhitelistedTokens.length - 1) {
                     allWhitelistedTokens[i] = allWhitelistedTokens[
                         allWhitelistedTokens.length - 1
                     ];
-                    allWhitelistedTokens.pop();
                 }
+                // Remove the last element from the array. This will either:
+                // - Remove a duplicated address if the last address was copied into the spot of the target token's address
+                // - Remove the target address since it's the last element in the array (no swap occurred)
+                allWhitelistedTokens.pop();
                 break;
             }
             unchecked {

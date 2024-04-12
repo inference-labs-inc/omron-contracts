@@ -429,6 +429,14 @@ describe("OmronDeposit", () => {
         parseEther("0")
       );
     });
+    it("Should restrict access to owner", async () => {
+      await expect(
+        deposit.contract.connect(user1).removeWhitelistedToken(token1.address)
+      ).to.be.revertedWithCustomError(
+        deposit.contract,
+        "OwnableUnauthorizedAccount"
+      );
+    });
     it("Should allow withdraw if a whitelisted token is re-added", async () => {
       await token1.contract.transfer(user1.address, parseEther("1"));
       await addAllowance(token1, user1, deposit, parseEther("1"));
