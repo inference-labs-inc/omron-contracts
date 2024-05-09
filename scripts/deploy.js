@@ -9,12 +9,10 @@ const tokens = {
   mainnet: {
     WETH: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
     ezETH: "0xbf5495Efe5DB9ce00f80364C8B423567e58d2110",
-    rsETH: "0xa1290d69c65a6fe4df752f95823fae25cb99e5a7",
   },
   sepolia: {
     WETH: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
     ezETH: "0x8b78223e2FD9FEa8D30F1A6E36D7A1dEfab28c5e",
-    rsETH: "0xa8aDB36208684Abc2fB64430f2456A07526d9362",
   },
   localhost: {},
 };
@@ -39,7 +37,11 @@ async function main() {
     tokenAddresses = erc20Deployments.map((d) => d.address);
   }
 
-  await deployContract("OmronDeposit", [wallets[0].address, tokenAddresses]);
+  const { contract } = await deployContract("OmronDeposit", [
+    wallets[0].address,
+    tokenAddresses,
+  ]);
+  await contract.pause();
 }
 let wasError = false;
 main()
